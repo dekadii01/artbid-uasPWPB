@@ -1,0 +1,67 @@
+@import "tailwindcss";
+
+@layer base {
+  body {
+    font-family: 'DM Sans', sans-serif;
+  }
+}
+
+@layer utilities {
+  @keyframes fadeUp {
+    from { opacity: 0; transform: translateY(32px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+  .fade-up  { animation: fadeUp 0.7s ease forwards; }
+  .delay-1  { animation-delay: 0.10s; opacity: 0; }
+  .delay-2  { animation-delay: 0.25s; opacity: 0; }
+  .delay-3  { animation-delay: 0.40s; opacity: 0; }
+  .delay-4  { animation-delay: 0.55s; opacity: 0; }
+
+  @keyframes pulse-dot {
+    0%, 100% { transform: scale(1); opacity: 1; }
+    50%       { transform: scale(1.5); opacity: 0.5; }
+  }
+  .live-dot { animation: pulse-dot 1.4s ease-in-out infinite; }
+
+  .card-lift {
+    transition: transform 0.3s ease, box-shadow 0.3s ease;
+  }
+  .card-lift:hover {
+    transform: translateY(-6px);
+    box-shadow: 0 20px 40px rgba(0,0,0,0.12);
+  }
+
+  .nav-bar { background: transparent; }
+  .nav-bar.nav-scrolled {
+    background: rgba(255,255,255,0.95) !important;
+    backdrop-filter: blur(12px);
+    box-shadow: 0 1px 20px rgba(0,0,0,0.08);
+  }
+  .nav-bar:not(.nav-scrolled) .nav-link  { color: rgba(255,255,255,0.85); }
+  .nav-bar:not(.nav-scrolled) .nav-link:hover { color: #fff; }
+  .nav-bar:not(.nav-scrolled) .nav-logo  { color: #fff; }
+  .nav-bar:not(.nav-scrolled) .nav-login { color: rgba(255,255,255,0.85); }
+  .nav-bar:not(.nav-scrolled) .nav-signup {
+    background: rgba(255,255,255,0.15);
+    border: 1px solid rgba(255,255,255,0.4);
+    color: #fff;
+  }
+  .nav-bar:not(.nav-scrolled) .nav-signup:hover { background: rgba(255,255,255,0.25); }
+
+  html { scroll-behavior: smooth; }
+
+  .mobile-menu {
+    transition: max-height 0.4s ease, opacity 0.4s ease;
+    max-height: 0; opacity: 0; overflow: hidden;
+  }
+  .mobile-menu.open { max-height: 440px; opacity: 1; }
+
+  .accordion-content {
+    max-height: 0; overflow: hidden;
+    transition: max-height 0.4s ease;
+  }
+  .accordion-content.open { max-height: 300px; }
+
+  .faq-icon { transition: transform 0.3s ease; }
+  .faq-icon.rotated { transform: rotate(180deg); }
+}
