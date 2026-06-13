@@ -42,9 +42,8 @@
   .nav-bar:not(.nav-scrolled) .nav-logo  { color: #fff; }
   .nav-bar:not(.nav-scrolled) .nav-login { color: rgba(255,255,255,0.85); }
   .nav-bar:not(.nav-scrolled) .nav-signup {
-    background: rgba(255,255,255,0.15);
-    border: 1px solid rgba(255,255,255,0.4);
-    color: #fff;
+    background: white;
+    color: #000;
   }
   .nav-bar:not(.nav-scrolled) .nav-signup:hover { background: rgba(255,255,255,0.25); }
 
