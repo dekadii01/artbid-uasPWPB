@@ -91,6 +91,7 @@ async function handleLogin() {
       remember: form.remember,
     });
 
+    window.location.href = "/auctions"; // Redirect to auctions page after successful login
     // Example: uncomment below to simulate an auth error
     // throw new Error('Email atau kata sandi tidak cocok.')
   } catch (err) {
