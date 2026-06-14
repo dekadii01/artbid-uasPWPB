@@ -667,8 +667,7 @@ const auctions = [
     bidCount: 24,
     viewers: 18,
     photoCount: 4,
-    image:
-      "https://images.unsplash.com/photo-1541961017774-22349e4a1262?w=600&q=80",
+    image: "img/art1.png",
     endsAt: hoursFromNow(2.8),
   },
   {
@@ -681,8 +680,7 @@ const auctions = [
     bidCount: 18,
     viewers: 9,
     photoCount: 2,
-    image:
-      "https://images.unsplash.com/photo-1578301978069-3c23ee44e8dc?w=600&q=80",
+    image: "img/art2.png",
     endsAt: hoursFromNow(2),
   },
   {
@@ -695,8 +693,7 @@ const auctions = [
     bidCount: 31,
     viewers: 22,
     photoCount: 3,
-    image:
-      "https://images.unsplash.com/photo-1569091791842-7cfb64e04797?w=600&q=80",
+    image: "img/art3.png",
     endsAt: hoursFromNow(5.4),
   },
   {
@@ -709,8 +706,7 @@ const auctions = [
     bidCount: 9,
     viewers: 4,
     photoCount: 1,
-    image:
-      "https://images.unsplash.com/photo-1490481651871-ab68de25d43d?w=600&q=80",
+    image: "img/art4.png",
     endsAt: hoursFromNow(0.75),
   },
   {
@@ -723,8 +719,7 @@ const auctions = [
     bidCount: 22,
     viewers: 15,
     photoCount: 2,
-    image:
-      "https://images.unsplash.com/photo-1579783902614-a3fb3927b6a5?w=600&q=80",
+    image: "img/art5.png",
     endsAt: hoursFromNow(1.2),
   },
   {
@@ -737,8 +732,7 @@ const auctions = [
     bidCount: 14,
     viewers: 7,
     photoCount: 3,
-    image:
-      "https://images.unsplash.com/photo-1501472312651-726afe119ff1?w=600&q=80",
+    image: "img/art6.png",
     endsAt: hoursFromNow(3.5),
   },
   {
@@ -751,8 +745,7 @@ const auctions = [
     bidCount: 0,
     viewers: 0,
     photoCount: 5,
-    image:
-      "https://images.unsplash.com/photo-1518544866330-4e716499f800?w=600&q=80",
+    image: "img/art7.png",
     startsAt: hoursFromNow(6),
   },
   {
@@ -765,8 +758,7 @@ const auctions = [
     bidCount: 0,
     viewers: 0,
     photoCount: 2,
-    image:
-      "https://images.unsplash.com/photo-1558618666-fcd25c85cd64?w=600&q=80",
+    image: "img/art8.png",
     startsAt: daysFromNow(1),
   },
   {
@@ -779,8 +771,7 @@ const auctions = [
     bidCount: 0,
     viewers: 0,
     photoCount: 3,
-    image:
-      "https://images.unsplash.com/photo-1576487236230-eaa4afe68192?w=600&q=80",
+    image: "img/art9.png",
     startsAt: daysFromNow(2),
   },
   {
@@ -793,8 +784,7 @@ const auctions = [
     bidCount: 0,
     viewers: 0,
     photoCount: 4,
-    image:
-      "https://images.unsplash.com/photo-1597696929736-6d13bed8e6a8?w=600&q=80",
+    image: "img/art10.png",
     startsAt: daysFromNow(3),
   },
   {
@@ -807,8 +797,7 @@ const auctions = [
     bidCount: 47,
     viewers: 0,
     photoCount: 2,
-    image:
-      "https://images.unsplash.com/photo-1565367777-8879b08cd5b6?w=600&q=80",
+    image: "img/art11.png",
   },
   {
     id: 12,
@@ -820,8 +809,7 @@ const auctions = [
     bidCount: 61,
     viewers: 0,
     photoCount: 6,
-    image:
-      "https://images.unsplash.com/photo-1531804055935-76f44d7c3621?w=600&q=80",
+    image: "img/art12.png",
   },
   {
     id: 13,
@@ -833,8 +821,7 @@ const auctions = [
     bidCount: 11,
     viewers: 0,
     photoCount: 3,
-    image:
-      "https://images.unsplash.com/photo-1611085583191-a3b181a88401?w=600&q=80",
+    image: "img/art13.png",
   },
   {
     id: 14,
@@ -846,8 +833,7 @@ const auctions = [
     bidCount: 33,
     viewers: 0,
     photoCount: 4,
-    image:
-      "https://images.unsplash.com/photo-1481627834876-b7833e8f5570?w=600&q=80",
+    image: "img/art14.png",
   },
 ];
 
