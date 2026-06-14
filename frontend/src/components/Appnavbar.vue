@@ -136,12 +136,12 @@
         </div>
 
         <!-- Buat Lelang CTA -->
-        <button
+        <!-- <button
           @click="router.push('/auction/create')"
           class="cursor-pointer px-5 py-2 bg-black text-white rounded-lg text-sm font-medium hover:bg-gray-800 transition-colors"
         >
           + Buat Lelang
-        </button>
+        </button> -->
       </div>
     </div>
 
@@ -250,12 +250,12 @@
 
         <!-- CTA + Logout -->
         <div class="flex gap-2 pt-2 border-t border-gray-100">
-          <button
+          <!-- <button
             @click="router.push('/auction/create')"
             class="cursor-pointer flex-1 py-2.5 bg-black text-white rounded-lg text-sm font-medium"
           >
             + Buat Lelang
-          </button>
+          </button> -->
           <button
             @click="handleLogout"
             class="px-4 py-2.5 border border-red-100 text-red-500 rounded-lg text-sm font-medium hover:bg-red-50 transition-colors"
