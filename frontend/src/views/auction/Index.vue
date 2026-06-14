@@ -1,3 +1,354 @@
+<script setup>
+import { ref, computed, onMounted, onUnmounted } from "vue";
+import Navbar from "../../components/Appnavbar.vue";
+
+// ─── Helpers ─────────────────────────────────────────────────────
+function formatRupiah(value) {
+  return new Intl.NumberFormat("id-ID", {
+    style: "currency",
+    currency: "IDR",
+    maximumFractionDigits: 0,
+  }).format(value);
+}
+
+function parseCountdown(targetIso) {
+  const diff = Math.max(0, new Date(targetIso) - now.value);
+  const days = Math.floor(diff / 86400000);
+  const hours = Math.floor((diff % 86400000) / 3600000);
+  const minutes = Math.floor((diff % 3600000) / 60000);
+  const seconds = Math.floor((diff % 60000) / 1000);
+  return { days, hours, minutes, seconds };
+}
+
+// ─── Reactive clock ──────────────────────────────────────────────
+const now = ref(new Date());
+let ticker;
+onMounted(() => {
+  ticker = setInterval(() => {
+    now.value = new Date();
+  }, 1000);
+});
+onUnmounted(() => clearInterval(ticker));
+
+// ─── Filters ─────────────────────────────────────────────────────
+const searchQuery = ref("");
+const selectedCategory = ref("");
+const selectedStatus = ref("all");
+const sortBy = ref("latest");
+const currentPage = ref(1);
+const perPage = 9;
+
+const categories = [
+  "Lukisan",
+  "Patung",
+  "Topeng Tradisional",
+  "Ukiran Kayu",
+  "Kerajinan Perak",
+  "Barang Antik",
+  "Koleksi Langka",
+];
+
+const statusTabs = computed(() => [
+  { label: "Semua", value: "all", count: auctions.length },
+  {
+    label: "Sedang Berlangsung",
+    value: "live",
+    count: auctions.filter((a) => a.status === "live").length,
+  },
+  {
+    label: "Akan Datang",
+    value: "upcoming",
+    count: auctions.filter((a) => a.status === "upcoming").length,
+  },
+  {
+    label: "Selesai",
+    value: "ended",
+    count: auctions.filter((a) => a.status === "ended").length,
+  },
+]);
+
+function resetFilters() {
+  searchQuery.value = "";
+  selectedCategory.value = "";
+  selectedStatus.value = "all";
+  sortBy.value = "latest";
+  currentPage.value = 1;
+}
+
+// ─── Platform stats sidebar ───────────────────────────────────────
+const platformStats = [
+  { key: "active", label: "Lelang Aktif", value: "128" },
+  { key: "bids", label: "Total Penawaran Hari Ini", value: "1.245" },
+  { key: "online", label: "Pengguna Online", value: "86" },
+  { key: "sold", label: "Barang Terjual", value: "532" },
+].filter((s) => s.key !== "online");
+
+// ─── Dummy Data ───────────────────────────────────────────────────
+// endsAt / startsAt — relative to page load time so countdown is always meaningful in demo
+function hoursFromNow(h) {
+  return new Date(Date.now() + h * 3600000).toISOString();
+}
+function daysFromNow(d) {
+  return new Date(Date.now() + d * 86400000).toISOString();
+}
+
+const auctions = [
+  {
+    id: 1,
+    status: "live",
+    name: "Karma Tanah Lot",
+    category: "Lukisan",
+    seller: "I Wayan Sukerta",
+    currentPrice: 48500000,
+    bidCount: 24,
+    viewers: 18,
+    photoCount: 4,
+    image: "img/art1.png",
+    endsAt: hoursFromNow(2.8),
+  },
+  {
+    id: 2,
+    status: "live",
+    name: "Penjaga Bali",
+    category: "Patung",
+    seller: "I Made Wijaya",
+    currentPrice: 12500000,
+    bidCount: 18,
+    viewers: 9,
+    photoCount: 2,
+    image: "img/art2.png",
+    endsAt: hoursFromNow(2),
+  },
+  {
+    id: 3,
+    status: "live",
+    name: "Dewi Kesuburan",
+    category: "Patung",
+    seller: "Ni Luh Eka Sari",
+    currentPrice: 28000000,
+    bidCount: 31,
+    viewers: 22,
+    photoCount: 3,
+    image: "img/art3.png",
+    endsAt: hoursFromNow(5.4),
+  },
+  {
+    id: 4,
+    status: "live",
+    name: "Tanah & Api",
+    category: "Barang Antik",
+    seller: "Ketut Suardana",
+    currentPrice: 8750000,
+    bidCount: 9,
+    viewers: 4,
+    photoCount: 1,
+    image: "img/art4.png",
+    endsAt: hoursFromNow(0.75),
+  },
+  {
+    id: 5,
+    status: "live",
+    name: "Alam Tak Terbatas",
+    category: "Lukisan",
+    seller: "Sang Ayu Putu Riani",
+    currentPrice: 19200000,
+    bidCount: 22,
+    viewers: 15,
+    photoCount: 2,
+    image: "img/art5.png",
+    endsAt: hoursFromNow(1.2),
+  },
+  {
+    id: 6,
+    status: "live",
+    name: "Harmoni Semesta",
+    category: "Lukisan",
+    seller: "I Made Wijaya",
+    currentPrice: 15000000,
+    bidCount: 14,
+    viewers: 7,
+    photoCount: 3,
+    image: "img/art6.png",
+    endsAt: hoursFromNow(3.5),
+  },
+  {
+    id: 7,
+    status: "upcoming",
+    name: "Sunrise Penida",
+    category: "Koleksi Langka",
+    seller: "Agung Rai Photography",
+    currentPrice: 5000000,
+    bidCount: 0,
+    viewers: 0,
+    photoCount: 5,
+    image: "img/art7.png",
+    startsAt: hoursFromNow(6),
+  },
+  {
+    id: 8,
+    status: "upcoming",
+    name: "Jejak Digital",
+    category: "Koleksi Langka",
+    seller: "Dewa Gede Artana",
+    currentPrice: 35000000,
+    bidCount: 0,
+    viewers: 0,
+    photoCount: 2,
+    image: "img/art8.png",
+    startsAt: daysFromNow(1),
+  },
+  {
+    id: 9,
+    status: "upcoming",
+    name: "Topeng Rangda Antik",
+    category: "Topeng Tradisional",
+    seller: "I Nyoman Kariasa",
+    currentPrice: 22000000,
+    bidCount: 0,
+    viewers: 0,
+    photoCount: 3,
+    image: "img/art9.png",
+    startsAt: daysFromNow(2),
+  },
+  {
+    id: 10,
+    status: "upcoming",
+    name: "Ukiran Barong Gianyar",
+    category: "Ukiran Kayu",
+    seller: "Wayan Raka Sandi",
+    currentPrice: 17500000,
+    bidCount: 0,
+    viewers: 0,
+    photoCount: 4,
+    image: "img/art10.png",
+    startsAt: daysFromNow(3),
+  },
+  {
+    id: 11,
+    status: "ended",
+    name: "Bali Sunrise 1985",
+    category: "Lukisan",
+    seller: "I Gusti Nyoman Lempad Jr.",
+    currentPrice: 87500000,
+    bidCount: 47,
+    viewers: 0,
+    photoCount: 2,
+    image: "img/art11.png",
+  },
+  {
+    id: 12,
+    status: "ended",
+    name: "Keris Pusaka Abad XVIII",
+    category: "Barang Antik",
+    seller: "Puri Agung Karangasem",
+    currentPrice: 125000000,
+    bidCount: 61,
+    viewers: 0,
+    photoCount: 6,
+    image: "img/art12.png",
+  },
+  {
+    id: 13,
+    status: "ended",
+    name: "Gelang Perak Celuk",
+    category: "Kerajinan Perak",
+    seller: "Perak Bali Craft",
+    currentPrice: 4200000,
+    bidCount: 11,
+    viewers: 0,
+    photoCount: 3,
+    image: "img/art13.png",
+  },
+  {
+    id: 14,
+    status: "ended",
+    name: "Lontar Kuno Koleksi",
+    category: "Koleksi Langka",
+    seller: "Gedong Kirtya Archive",
+    currentPrice: 56000000,
+    bidCount: 33,
+    viewers: 0,
+    photoCount: 4,
+    image: "img/art14.png",
+  },
+];
+
+// ─── Computed ─────────────────────────────────────────────────────
+const filteredAuctions = computed(() => {
+  let result = [...auctions];
+
+  // Status filter
+  if (selectedStatus.value !== "all") {
+    result = result.filter((a) => a.status === selectedStatus.value);
+  }
+
+  // Category filter
+  if (selectedCategory.value) {
+    result = result.filter((a) => a.category === selectedCategory.value);
+  }
+
+  // Search
+  if (searchQuery.value.trim()) {
+    const q = searchQuery.value.toLowerCase();
+    result = result.filter(
+      (a) =>
+        a.name.toLowerCase().includes(q) ||
+        a.category.toLowerCase().includes(q) ||
+        a.seller.toLowerCase().includes(q),
+    );
+  }
+
+  // Sort
+  switch (sortBy.value) {
+    case "price_high":
+      result.sort((a, b) => b.currentPrice - a.currentPrice);
+      break;
+    case "price_low":
+      result.sort((a, b) => a.currentPrice - b.currentPrice);
+      break;
+    case "most_bids":
+      result.sort((a, b) => b.bidCount - a.bidCount);
+      break;
+    case "ending_soon":
+      result.sort((a, b) => {
+        const aTime = a.endsAt
+          ? new Date(a.endsAt)
+          : new Date(a.startsAt || "9999");
+        const bTime = b.endsAt
+          ? new Date(b.endsAt)
+          : new Date(b.startsAt || "9999");
+        return aTime - bTime;
+      });
+      break;
+    default:
+      break; // latest = original order
+  }
+
+  return result;
+});
+
+const totalPages = computed(() =>
+  Math.max(1, Math.ceil(filteredAuctions.value.length / perPage)),
+);
+
+const paginatedAuctions = computed(() => {
+  const start = (currentPage.value - 1) * perPage;
+  return filteredAuctions.value.slice(start, start + perPage);
+});
+
+// Reset to page 1 whenever filters change
+import { watch } from "vue";
+import router from "../../router/index.js";
+import { useRoute, useRouter } from "vue-router";
+watch([searchQuery, selectedCategory, selectedStatus, sortBy], () => {
+  currentPage.value = 1;
+});
+
+const goToAuction = (id) => {
+  router.push(`/auction/${id}`);
+};
+</script>
+
 <template>
   <div class="bg-white min-h-screen font-sans overflow-x-hidden mt-20">
     <Navbar />
@@ -408,18 +759,21 @@
               <div class="mt-auto">
                 <button
                   v-if="auction.status === 'live'"
+                  @click="goToAuction(auction.id)"
                   class="w-full py-2.5 bg-black text-white rounded-lg text-sm font-medium hover:bg-gray-800 transition-colors"
                 >
                   Tawar Sekarang
                 </button>
                 <button
                   v-else-if="auction.status === 'upcoming'"
+                  @click="goToAuction(auction.id)"
                   class="w-full py-2.5 border border-black text-black rounded-lg text-sm font-medium hover:bg-black hover:text-white transition-colors"
                 >
                   Lihat Detail
                 </button>
                 <button
                   v-else
+                  @click="goToAuction(auction.id)"
                   class="w-full py-2.5 border border-gray-200 text-gray-500 rounded-lg text-sm font-medium hover:border-black hover:text-black transition-colors"
                 >
                   Lihat Hasil
@@ -556,356 +910,9 @@
       </div>
       <!-- end main -->
     </div>
-    <Footer />
     <!-- end layout wrapper -->
   </div>
 </template>
-
-<script setup>
-import { ref, computed, onMounted, onUnmounted } from "vue";
-import Footer from "../../components/TheFooter.vue";
-import Navbar from "../../components/Appnavbar.vue";
-
-// ─── Helpers ─────────────────────────────────────────────────────
-function formatRupiah(value) {
-  return new Intl.NumberFormat("id-ID", {
-    style: "currency",
-    currency: "IDR",
-    maximumFractionDigits: 0,
-  }).format(value);
-}
-
-function parseCountdown(targetIso) {
-  const diff = Math.max(0, new Date(targetIso) - now.value);
-  const days = Math.floor(diff / 86400000);
-  const hours = Math.floor((diff % 86400000) / 3600000);
-  const minutes = Math.floor((diff % 3600000) / 60000);
-  const seconds = Math.floor((diff % 60000) / 1000);
-  return { days, hours, minutes, seconds };
-}
-
-// ─── Reactive clock ──────────────────────────────────────────────
-const now = ref(new Date());
-let ticker;
-onMounted(() => {
-  ticker = setInterval(() => {
-    now.value = new Date();
-  }, 1000);
-});
-onUnmounted(() => clearInterval(ticker));
-
-// ─── Filters ─────────────────────────────────────────────────────
-const searchQuery = ref("");
-const selectedCategory = ref("");
-const selectedStatus = ref("all");
-const sortBy = ref("latest");
-const currentPage = ref(1);
-const perPage = 9;
-
-const categories = [
-  "Lukisan",
-  "Patung",
-  "Topeng Tradisional",
-  "Ukiran Kayu",
-  "Kerajinan Perak",
-  "Barang Antik",
-  "Koleksi Langka",
-];
-
-const statusTabs = computed(() => [
-  { label: "Semua", value: "all", count: auctions.length },
-  {
-    label: "Sedang Berlangsung",
-    value: "live",
-    count: auctions.filter((a) => a.status === "live").length,
-  },
-  {
-    label: "Akan Datang",
-    value: "upcoming",
-    count: auctions.filter((a) => a.status === "upcoming").length,
-  },
-  {
-    label: "Selesai",
-    value: "ended",
-    count: auctions.filter((a) => a.status === "ended").length,
-  },
-]);
-
-function resetFilters() {
-  searchQuery.value = "";
-  selectedCategory.value = "";
-  selectedStatus.value = "all";
-  sortBy.value = "latest";
-  currentPage.value = 1;
-}
-
-// ─── Platform stats sidebar ───────────────────────────────────────
-const platformStats = [
-  { key: "active", label: "Lelang Aktif", value: "128" },
-  { key: "bids", label: "Total Penawaran Hari Ini", value: "1.245" },
-  { key: "online", label: "Pengguna Online", value: "86" },
-  { key: "sold", label: "Barang Terjual", value: "532" },
-].filter((s) => s.key !== "online");
-
-// ─── Dummy Data ───────────────────────────────────────────────────
-// endsAt / startsAt — relative to page load time so countdown is always meaningful in demo
-function hoursFromNow(h) {
-  return new Date(Date.now() + h * 3600000).toISOString();
-}
-function daysFromNow(d) {
-  return new Date(Date.now() + d * 86400000).toISOString();
-}
-
-const auctions = [
-  {
-    id: 1,
-    status: "live",
-    name: "Karma Tanah Lot",
-    category: "Lukisan",
-    seller: "I Wayan Sukerta",
-    currentPrice: 48500000,
-    bidCount: 24,
-    viewers: 18,
-    photoCount: 4,
-    image: "img/art1.png",
-    endsAt: hoursFromNow(2.8),
-  },
-  {
-    id: 2,
-    status: "live",
-    name: "Penjaga Bali",
-    category: "Patung",
-    seller: "I Made Wijaya",
-    currentPrice: 12500000,
-    bidCount: 18,
-    viewers: 9,
-    photoCount: 2,
-    image: "img/art2.png",
-    endsAt: hoursFromNow(2),
-  },
-  {
-    id: 3,
-    status: "live",
-    name: "Dewi Kesuburan",
-    category: "Patung",
-    seller: "Ni Luh Eka Sari",
-    currentPrice: 28000000,
-    bidCount: 31,
-    viewers: 22,
-    photoCount: 3,
-    image: "img/art3.png",
-    endsAt: hoursFromNow(5.4),
-  },
-  {
-    id: 4,
-    status: "live",
-    name: "Tanah & Api",
-    category: "Barang Antik",
-    seller: "Ketut Suardana",
-    currentPrice: 8750000,
-    bidCount: 9,
-    viewers: 4,
-    photoCount: 1,
-    image: "img/art4.png",
-    endsAt: hoursFromNow(0.75),
-  },
-  {
-    id: 5,
-    status: "live",
-    name: "Alam Tak Terbatas",
-    category: "Lukisan",
-    seller: "Sang Ayu Putu Riani",
-    currentPrice: 19200000,
-    bidCount: 22,
-    viewers: 15,
-    photoCount: 2,
-    image: "img/art5.png",
-    endsAt: hoursFromNow(1.2),
-  },
-  {
-    id: 6,
-    status: "live",
-    name: "Harmoni Semesta",
-    category: "Lukisan",
-    seller: "I Made Wijaya",
-    currentPrice: 15000000,
-    bidCount: 14,
-    viewers: 7,
-    photoCount: 3,
-    image: "img/art6.png",
-    endsAt: hoursFromNow(3.5),
-  },
-  {
-    id: 7,
-    status: "upcoming",
-    name: "Sunrise Penida",
-    category: "Koleksi Langka",
-    seller: "Agung Rai Photography",
-    currentPrice: 5000000,
-    bidCount: 0,
-    viewers: 0,
-    photoCount: 5,
-    image: "img/art7.png",
-    startsAt: hoursFromNow(6),
-  },
-  {
-    id: 8,
-    status: "upcoming",
-    name: "Jejak Digital",
-    category: "Koleksi Langka",
-    seller: "Dewa Gede Artana",
-    currentPrice: 35000000,
-    bidCount: 0,
-    viewers: 0,
-    photoCount: 2,
-    image: "img/art8.png",
-    startsAt: daysFromNow(1),
-  },
-  {
-    id: 9,
-    status: "upcoming",
-    name: "Topeng Rangda Antik",
-    category: "Topeng Tradisional",
-    seller: "I Nyoman Kariasa",
-    currentPrice: 22000000,
-    bidCount: 0,
-    viewers: 0,
-    photoCount: 3,
-    image: "img/art9.png",
-    startsAt: daysFromNow(2),
-  },
-  {
-    id: 10,
-    status: "upcoming",
-    name: "Ukiran Barong Gianyar",
-    category: "Ukiran Kayu",
-    seller: "Wayan Raka Sandi",
-    currentPrice: 17500000,
-    bidCount: 0,
-    viewers: 0,
-    photoCount: 4,
-    image: "img/art10.png",
-    startsAt: daysFromNow(3),
-  },
-  {
-    id: 11,
-    status: "ended",
-    name: "Bali Sunrise 1985",
-    category: "Lukisan",
-    seller: "I Gusti Nyoman Lempad Jr.",
-    currentPrice: 87500000,
-    bidCount: 47,
-    viewers: 0,
-    photoCount: 2,
-    image: "img/art11.png",
-  },
-  {
-    id: 12,
-    status: "ended",
-    name: "Keris Pusaka Abad XVIII",
-    category: "Barang Antik",
-    seller: "Puri Agung Karangasem",
-    currentPrice: 125000000,
-    bidCount: 61,
-    viewers: 0,
-    photoCount: 6,
-    image: "img/art12.png",
-  },
-  {
-    id: 13,
-    status: "ended",
-    name: "Gelang Perak Celuk",
-    category: "Kerajinan Perak",
-    seller: "Perak Bali Craft",
-    currentPrice: 4200000,
-    bidCount: 11,
-    viewers: 0,
-    photoCount: 3,
-    image: "img/art13.png",
-  },
-  {
-    id: 14,
-    status: "ended",
-    name: "Lontar Kuno Koleksi",
-    category: "Koleksi Langka",
-    seller: "Gedong Kirtya Archive",
-    currentPrice: 56000000,
-    bidCount: 33,
-    viewers: 0,
-    photoCount: 4,
-    image: "img/art14.png",
-  },
-];
-
-// ─── Computed ─────────────────────────────────────────────────────
-const filteredAuctions = computed(() => {
-  let result = [...auctions];
-
-  // Status filter
-  if (selectedStatus.value !== "all") {
-    result = result.filter((a) => a.status === selectedStatus.value);
-  }
-
-  // Category filter
-  if (selectedCategory.value) {
-    result = result.filter((a) => a.category === selectedCategory.value);
-  }
-
-  // Search
-  if (searchQuery.value.trim()) {
-    const q = searchQuery.value.toLowerCase();
-    result = result.filter(
-      (a) =>
-        a.name.toLowerCase().includes(q) ||
-        a.category.toLowerCase().includes(q) ||
-        a.seller.toLowerCase().includes(q),
-    );
-  }
-
-  // Sort
-  switch (sortBy.value) {
-    case "price_high":
-      result.sort((a, b) => b.currentPrice - a.currentPrice);
-      break;
-    case "price_low":
-      result.sort((a, b) => a.currentPrice - b.currentPrice);
-      break;
-    case "most_bids":
-      result.sort((a, b) => b.bidCount - a.bidCount);
-      break;
-    case "ending_soon":
-      result.sort((a, b) => {
-        const aTime = a.endsAt
-          ? new Date(a.endsAt)
-          : new Date(a.startsAt || "9999");
-        const bTime = b.endsAt
-          ? new Date(b.endsAt)
-          : new Date(b.startsAt || "9999");
-        return aTime - bTime;
-      });
-      break;
-    default:
-      break; // latest = original order
-  }
-
-  return result;
-});
-
-const totalPages = computed(() =>
-  Math.max(1, Math.ceil(filteredAuctions.value.length / perPage)),
-);
-
-const paginatedAuctions = computed(() => {
-  const start = (currentPage.value - 1) * perPage;
-  return filteredAuctions.value.slice(start, start + perPage);
-});
-
-// Reset to page 1 whenever filters change
-import { watch } from "vue";
-watch([searchQuery, selectedCategory, selectedStatus, sortBy], () => {
-  currentPage.value = 1;
-});
-</script>
 
 <style scoped>
 @keyframes pulse-dot {
