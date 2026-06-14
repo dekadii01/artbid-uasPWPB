@@ -7,6 +7,7 @@ import AuctionShowView from "../views/auction/Show.vue";
 import AuctionCreateView from "../views/auction/Create.vue";
 import MyBidsView from "../views/mybids/Index.vue";
 import WatchlistView from "../views/watchlist/Index.vue";
+import MyAuctionsView from "../views/myauctions/Index.vue";
 
 const routes = [
   {
@@ -55,6 +56,12 @@ const routes = [
     path: "/watchlist",
     name: "Watchlist",
     component: WatchlistView,
+    meta: { layout: "app" },
+  },
+  {
+    path: "/my-auctions",
+    name: "MyAuctions",
+    component: MyAuctionsView,
     meta: { layout: "app" },
   },
   // Tambah route baru di sini dengan meta: { layout: "app" }
