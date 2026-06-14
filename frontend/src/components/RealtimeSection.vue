@@ -1,27 +1,28 @@
 <script setup>
 import { ref, onMounted, onUnmounted } from "vue";
+import { Icon } from "@iconify/vue";
 
 const features = [
   {
-    icon: "M13 10V3L4 14h7v7l9-11h-7z",
+    icon: "mdi:lightning-bolt",
     title: "Update Harga Instan",
     description:
       "Harga berubah secara langsung di layar semua peserta saat tawaran baru masuk.",
   },
   {
-    icon: "M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z",
+    icon: "mdi:clock-fast",
     title: "Countdown Otomatis",
     description:
       "Timer mundur presisi hingga detik terakhir — diperpanjang otomatis saat tawaran terakhir masuk.",
   },
   {
-    icon: "M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9",
+    icon: "mdi:bell-ring",
     title: "Notifikasi Tawaran Baru",
     description:
       "Terima notifikasi push dan in-app setiap ada tawaran yang mengalahkan penawaranmu.",
   },
   {
-    icon: "M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z",
+    icon: "mdi:trophy-outline",
     title: "Pengumuman Pemenang Otomatis",
     description:
       "Pemenang diumumkan secara otomatis dan langsung mendapatkan instruksi transaksi.",
@@ -113,19 +114,7 @@ const ajukanTawaran = () => {
             <div
               class="w-10 h-10 bg-white/10 rounded-xl flex items-center justify-center shrink-0 mt-0.5"
             >
-              <svg
-                class="w-5 h-5 text-white"
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
-              >
-                <path
-                  stroke-linecap="round"
-                  stroke-linejoin="round"
-                  stroke-width="2"
-                  :d="feature.icon"
-                />
-              </svg>
+              <Icon :icon="feature.icon" class="w-5 h-5 text-white" />
             </div>
             <div>
               <p class="text-white font-medium text-sm">{{ feature.title }}</p>
