@@ -389,7 +389,7 @@ function resetForm() {
         >
           <div
             :class="[
-              'w-6 h-6 rounded-lg flex items-center justify-center text-xs font-bold flex-shrink-0',
+              'w-6 h-6 rounded-lg flex items-center justify-center text-xs font-bold shrink-0',
               currentStep > idx
                 ? 'bg-white text-black'
                 : currentStep === idx
@@ -439,7 +439,7 @@ function resetForm() {
               <div class="flex items-center gap-3">
                 <div
                   :class="[
-                    'w-8 h-8 rounded-lg flex items-center justify-center text-sm flex-shrink-0',
+                    'w-8 h-8 rounded-lg flex items-center justify-center text-sm shrink-0',
                     sectionDone[0]
                       ? 'bg-black text-white'
                       : 'bg-gray-100 text-gray-500',
@@ -619,7 +619,7 @@ function resetForm() {
               <div class="flex items-center gap-3">
                 <div
                   :class="[
-                    'w-8 h-8 rounded-lg flex items-center justify-center text-sm flex-shrink-0',
+                    'w-8 h-8 rounded-lg flex items-center justify-center text-sm shrink-0',
                     sectionDone[1]
                       ? 'bg-black text-white'
                       : 'bg-gray-100 text-gray-500',
@@ -851,7 +851,7 @@ function resetForm() {
                 class="bg-blue-50 border border-blue-100 rounded-xl px-4 py-3.5 flex gap-3"
               >
                 <svg
-                  class="w-4 h-4 text-blue-400 flex-shrink-0 mt-0.5"
+                  class="w-4 h-4 text-blue-400 shrink-0 mt-0.5"
                   fill="none"
                   stroke="currentColor"
                   viewBox="0 0 24 24"
@@ -884,7 +884,7 @@ function resetForm() {
               <div class="flex items-center gap-3">
                 <div
                   :class="[
-                    'w-8 h-8 rounded-lg flex items-center justify-center text-sm flex-shrink-0',
+                    'w-8 h-8 rounded-lg flex items-center justify-center text-sm shrink-0',
                     sectionDone[2]
                       ? 'bg-black text-white'
                       : 'bg-gray-100 text-gray-500',
@@ -1039,7 +1039,7 @@ function resetForm() {
                     <button
                       @click="form.antiSnipe = !form.antiSnipe"
                       :class="[
-                        'relative w-11 h-6 rounded-full transition-all duration-200 flex-shrink-0',
+                        'relative w-11 h-6 rounded-full transition-all duration-200 shrink-0',
                         form.antiSnipe ? 'bg-black' : 'bg-gray-200',
                       ]"
                     >
@@ -1147,7 +1147,7 @@ function resetForm() {
                   class="bg-gray-50 rounded-xl px-5 py-4 flex items-center gap-4 border border-gray-100"
                 >
                   <svg
-                    class="w-5 h-5 text-gray-400 flex-shrink-0"
+                    class="w-5 h-5 text-gray-400 shrink-0"
                     fill="none"
                     stroke="currentColor"
                     viewBox="0 0 24 24"
@@ -1189,7 +1189,7 @@ function resetForm() {
           <!-- ── SECTION 4: Persetujuan ──────────────────────────────── -->
           <div class="bg-white rounded-2xl border border-gray-100 px-6 py-5">
             <label class="flex items-start gap-4 cursor-pointer group">
-              <div class="flex-shrink-0 mt-0.5">
+              <div class="shrink-0 mt-0.5">
                 <div
                   @click="form.agreed = !form.agreed"
                   :class="[
@@ -1274,7 +1274,7 @@ function resetForm() {
 
         <!-- ── SIDEBAR: Ringkasan ──────────────────────────────────── -->
         <aside
-          class="hidden xl:flex flex-col gap-4 w-72 flex-shrink-0 sticky top-24"
+          class="hidden xl:flex flex-col gap-4 w-72 shrink-0 sticky top-24"
         >
           <!-- Preview card -->
           <div
@@ -1384,7 +1384,7 @@ function resetForm() {
               >
                 <div
                   :class="[
-                    'w-4 h-4 rounded flex items-center justify-center flex-shrink-0',
+                    'w-4 h-4 rounded flex items-center justify-center shrink-0',
                     check.done ? 'bg-black' : 'bg-gray-100',
                   ]"
                 >
@@ -1438,7 +1438,7 @@ function resetForm() {
                 :key="tip"
                 class="flex items-start gap-2 text-xs text-gray-500 leading-relaxed"
               >
-                <span class="text-black mt-0.5 flex-shrink-0">•</span>
+                <span class="text-black mt-0.5 shrink-0">•</span>
                 {{ tip }}
               </li>
             </ul>

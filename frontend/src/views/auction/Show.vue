@@ -516,7 +516,7 @@ const relatedAuctions = [
               <button
                 @click="watchlisted = !watchlisted"
                 :class="[
-                  'flex-shrink-0 w-10 h-10 rounded-xl border-2 flex items-center justify-center transition-all duration-200',
+                  'shrink-0 w-10 h-10 rounded-xl border-2 flex items-center justify-center transition-all duration-200',
                   watchlisted
                     ? 'border-black bg-black text-white'
                     : 'border-gray-200 text-gray-400 hover:border-black hover:text-black',
@@ -621,7 +621,7 @@ const relatedAuctions = [
                   <div class="flex items-center gap-3">
                     <img
                       :src="bid.avatar"
-                      class="w-7 h-7 rounded-full object-cover flex-shrink-0"
+                      class="w-7 h-7 rounded-full object-cover shrink-0"
                     />
                     <div>
                       <p
@@ -678,7 +678,7 @@ const relatedAuctions = [
                   :key="act.id"
                   class="flex items-start gap-2.5 text-sm text-gray-500"
                 >
-                  <span class="mt-0.5 flex-shrink-0">{{ act.icon }}</span>
+                  <span class="mt-0.5 shrink-0">{{ act.icon }}</span>
                   <p class="leading-relaxed">
                     {{ act.text }}
                     <span class="text-gray-300 text-xs ml-1">{{
@@ -966,7 +966,7 @@ const relatedAuctions = [
             >
               <div class="flex items-center gap-4">
                 <div
-                  class="w-12 h-12 bg-black rounded-xl flex items-center justify-center text-2xl flex-shrink-0"
+                  class="w-12 h-12 bg-black rounded-xl flex items-center justify-center text-2xl shrink-0"
                 >
                   🏆
                 </div>

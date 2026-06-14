@@ -5,6 +5,7 @@ import RegisterView from "../views/RegisterView.vue";
 import AuctionIndexView from "../views/auction/Index.vue";
 import AuctionShowView from "../views/auction/Show.vue";
 import AuctionCreateView from "../views/auction/Create.vue";
+import MyBidsView from "../views/mybids/Index.vue";
 
 const routes = [
   {
@@ -41,6 +42,12 @@ const routes = [
     path: "/auction/create",
     name: "AuctionCreate",
     component: AuctionCreateView,
+    meta: { layout: "app" },
+  },
+  {
+    path: "/my-bids",
+    name: "MyBids",
+    component: MyBidsView,
     meta: { layout: "app" },
   },
   // Tambah route baru di sini dengan meta: { layout: "app" }
