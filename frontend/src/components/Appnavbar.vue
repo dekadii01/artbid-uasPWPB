@@ -315,7 +315,7 @@ const navLinks = [
   { label: "Daftar Lelang", to: "/auctions" },
   { label: "Tawaran Saya", to: "/my-bids" },
   { label: "Watchlist", to: "/watchlist" },
-  { label: "Jual Karya", to: "/sell" },
+  { label: "Karya Saya", to: "/my-auctions" },
 ];
 
 // ── Profile dropdown menu ──────────────────────────────────────────
