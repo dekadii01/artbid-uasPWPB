@@ -4,6 +4,7 @@ import LoginView from "../views/LoginView.vue";
 import RegisterView from "../views/RegisterView.vue";
 import AuctionIndexView from "../views/auction/Index.vue";
 import AuctionShowView from "../views/auction/Show.vue";
+import AuctionCreateView from "../views/auction/Create.vue";
 
 const routes = [
   {
@@ -34,6 +35,12 @@ const routes = [
     path: "/auction/:id",
     name: "AuctionShow",
     component: AuctionShowView,
+    meta: { layout: "app" },
+  },
+  {
+    path: "/auction/create",
+    name: "AuctionCreate",
+    component: AuctionCreateView,
     meta: { layout: "app" },
   },
   // Tambah route baru di sini dengan meta: { layout: "app" }
