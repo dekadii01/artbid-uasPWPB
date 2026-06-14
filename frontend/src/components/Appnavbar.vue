@@ -156,6 +156,7 @@
 
         <!-- Buat Lelang CTA -->
         <button
+          @click="router.push('/auction/create')"
           class="px-5 py-2 bg-black text-white rounded-lg text-sm font-medium hover:bg-gray-800 transition-colors"
         >
           + Buat Lelang
@@ -269,6 +270,7 @@
         <!-- CTA + Logout -->
         <div class="flex gap-2 pt-2 border-t border-gray-100">
           <button
+            @click="router.push('/auction/create')"
             class="flex-1 py-2.5 bg-black text-white rounded-lg text-sm font-medium"
           >
             + Buat Lelang
