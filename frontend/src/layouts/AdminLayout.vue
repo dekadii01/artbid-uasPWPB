@@ -6,7 +6,6 @@
       :style="{ marginLeft: sidebarWidth }"
     >
       <router-view />
-      <!-- ← BUKAN <slot />, karena ini layout via router children -->
     </div>
   </div>
 </template>
