@@ -8,6 +8,8 @@ import AuctionCreateView from "../views/auction/Create.vue";
 import MyBidsView from "../views/mybids/Index.vue";
 import WatchlistView from "../views/watchlist/Index.vue";
 import MyAuctionsView from "../views/myauctions/Index.vue";
+import AdminDashboardView from "../views/admin/Admindashboard.vue";
+import AdminLayout from "../layouts/AdminLayout.vue";
 
 const routes = [
   {
@@ -64,13 +66,18 @@ const routes = [
     component: MyAuctionsView,
     meta: { layout: "app" },
   },
-  // Tambah route baru di sini dengan meta: { layout: "app" }
-  // {
-  //   path: "/my-bids",
-  //   name: "MyBids",
-  //   component: MyBidsView,
-  //   meta: { layout: "app" },
-  // },
+  {
+    path: "/admin",
+    component: AdminLayout,
+    children: [
+      {
+        path: "dashboard",
+        name: "AdminDashboard",
+        component: AdminDashboardView,
+        meta: { layout: "admin" },
+      },
+    ],
+  },
 ];
 
 const router = createRouter({
