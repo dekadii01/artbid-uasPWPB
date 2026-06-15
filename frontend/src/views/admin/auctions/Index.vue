@@ -474,7 +474,7 @@ function exportData() {
   <div class="min-h-screen bg-gray-50 font-sans flex flex-col">
     <div class="flex-1 px-8 py-8 space-y-6">
       <!-- ═══════════════════ HEADER ═══════════════════ -->
-      <div class="flex justify-between items-center">
+      <div class="">
         <div>
           <span
             class="text-xs font-semibold tracking-[0.2em] uppercase text-gray-400"
@@ -489,25 +489,6 @@ function exportData() {
             aturan yang telah ditetapkan.
           </p>
         </div>
-        <button
-          @click="$router.push('/admin/auctions/create')"
-          class="flex items-center gap-2 px-5 py-2 bg-black text-white rounded-xl text-sm font-medium hover:bg-gray-800 transition-colors"
-        >
-          <svg
-            class="w-4 h-4"
-            fill="none"
-            stroke="currentColor"
-            viewBox="0 0 24 24"
-          >
-            <path
-              stroke-linecap="round"
-              stroke-linejoin="round"
-              stroke-width="2"
-              d="M12 4v16m8-8H4"
-            />
-          </svg>
-          Tambah Lelang
-        </button>
       </div>
 
       <!-- ═══════════════════ SYSTEM ALERTS ═══════════════════ -->
