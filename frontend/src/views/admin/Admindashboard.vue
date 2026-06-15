@@ -320,10 +320,7 @@ function actStyle(type) {
 <template>
   <div class="min-h-screen bg-gray-50 font-sans flex">
     <!-- Main area — offset matches sidebar width via CSS var -->
-    <div
-      class="flex-1 flex flex-col min-w-0 transition-all duration-300"
-      :style="{ marginLeft: sidebarWidth }"
-    >
+    <div class="flex-1 flex flex-col min-w-0 transition-all duration-300">
       <!-- ═══════════════════ TOPBAR ═══════════════════ -->
       <header
         class="sticky top-0 z-30 bg-white border-b border-gray-100 px-8 py-3.5 flex items-center justify-between gap-4"
