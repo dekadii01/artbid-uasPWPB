@@ -287,7 +287,7 @@ const modalConfig = computed(() => {
 
 <template>
   <div class="min-h-screen bg-gray-50 font-sans flex flex-col">
-    <div class="flex-1 px-8 py-8 space-y-6 max-w-screen-2xl mx-auto w-full">
+    <div class="flex-1 px-8 py-8 space-y-6 mx-auto w-full">
       <!-- ══ HEADER ══ -->
       <div class="space-y-1">
         <nav class="flex items-center gap-1.5 text-xs text-gray-400">
