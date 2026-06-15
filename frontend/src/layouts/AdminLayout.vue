@@ -5,6 +5,7 @@
       class="flex-1 flex flex-col min-w-0 transition-all duration-300"
       :style="{ marginLeft: sidebarWidth }"
     >
+      <AdminTopbar />
       <router-view />
     </div>
   </div>
@@ -13,6 +14,7 @@
 <script setup>
 import { ref, computed, provide } from "vue";
 import AdminSidebar from "../components/admin/AdminSidebar.vue";
+import AdminTopbar from "../components/admin/AdminTopbar.vue";
 
 const collapsed = ref(false);
 provide("sidebarCollapsed", collapsed);
