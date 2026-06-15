@@ -17,5 +17,5 @@ import AdminSidebar from "../components/admin/AdminSidebar.vue";
 const collapsed = ref(false);
 provide("sidebarCollapsed", collapsed);
 
-const sidebarWidth = computed(() => (collapsed.value ? "" : ""));
+const sidebarWidth = computed(() => (collapsed.value ? "60px" : "240px"));
 </script>

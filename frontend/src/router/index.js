@@ -10,6 +10,7 @@ import WatchlistView from "../views/watchlist/Index.vue";
 import MyAuctionsView from "../views/myauctions/Index.vue";
 import AdminDashboardView from "../views/admin/Admindashboard.vue";
 import AdminLayout from "../layouts/AdminLayout.vue";
+import AdminauctionsindexView from "../views/admin/auctions/Index.vue";
 
 const routes = [
   {
@@ -74,6 +75,12 @@ const routes = [
         path: "dashboard",
         name: "AdminDashboard",
         component: AdminDashboardView,
+        meta: { layout: "admin" },
+      },
+      {
+        path: "auctions",
+        name: "AdminAuctions",
+        component: AdminauctionsindexView,
         meta: { layout: "admin" },
       },
     ],
