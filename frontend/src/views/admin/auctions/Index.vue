@@ -522,7 +522,7 @@ function exportData() {
 
     <div class="flex-1 px-8 py-8 space-y-6">
       <!-- ═══════════════════ HEADER ═══════════════════ -->
-      <div class="fade-up delay-1">
+      <div class="">
         <span
           class="text-xs font-semibold tracking-[0.2em] uppercase text-gray-400"
           >Admin Panel</span
@@ -538,7 +538,7 @@ function exportData() {
       </div>
 
       <!-- ═══════════════════ SYSTEM ALERTS ═══════════════════ -->
-      <div class="space-y-2 fade-up delay-1">
+      <div class="space-y-2">
         <div
           v-for="alert in systemAlerts"
           :key="alert.text"
@@ -546,7 +546,7 @@ function exportData() {
         >
           <div
             :class="[
-              'w-7 h-7 rounded-lg flex items-center justify-center flex-shrink-0',
+              'w-7 h-7 rounded-lg flex items-center justify-center shrink-0',
               alert.dark ? 'bg-black' : 'bg-gray-100',
             ]"
           >
@@ -567,7 +567,7 @@ function exportData() {
           </div>
           <p class="text-sm text-gray-700 flex-1">{{ alert.text }}</p>
           <button
-            class="text-xs text-gray-500 hover:text-black font-medium transition-colors flex-shrink-0 whitespace-nowrap"
+            class="text-xs text-gray-500 hover:text-black font-medium transition-colors shrink-0 whitespace-nowrap"
           >
             {{ alert.action }}
           </button>
@@ -575,7 +575,7 @@ function exportData() {
       </div>
 
       <!-- ═══════════════════ STATS ═══════════════════ -->
-      <div class="grid grid-cols-2 xl:grid-cols-4 gap-4 fade-up delay-2">
+      <div class="grid grid-cols-2 xl:grid-cols-4 gap-4">
         <div
           v-for="stat in stats"
           :key="stat.label"
@@ -633,9 +633,7 @@ function exportData() {
       </div>
 
       <!-- ═══════════════════ FILTERS ═══════════════════ -->
-      <div
-        class="bg-white rounded-2xl border border-gray-100 p-5 fade-up delay-2"
-      >
+      <div class="bg-white rounded-2xl border border-gray-100 p-5">
         <div class="flex flex-col xl:flex-row gap-3">
           <!-- Status tabs -->
           <div class="flex flex-wrap gap-2 flex-1">
@@ -742,7 +740,7 @@ function exportData() {
       </div>
 
       <!-- ═══════════════════ MAIN CONTENT ═══════════════════ -->
-      <div class="grid grid-cols-1 xl:grid-cols-3 gap-6 fade-up delay-3">
+      <div class="grid grid-cols-1 xl:grid-cols-3 gap-6">
         <!-- ── TABLE ── -->
         <div class="xl:col-span-2 space-y-4">
           <!-- Table card -->
@@ -862,14 +860,14 @@ function exportData() {
                     <td class="px-6 py-4">
                       <div class="flex items-center gap-3">
                         <div
-                          class="w-10 h-10 rounded-xl bg-cover bg-center bg-gray-100 flex-shrink-0"
+                          class="w-10 h-10 rounded-xl bg-cover bg-center bg-gray-100 shrink-0"
                           :style="{
                             backgroundImage: `url('${auction.image}')`,
                           }"
                         ></div>
                         <div class="min-w-0">
                           <p
-                            class="text-sm font-medium text-black truncate max-w-[160px]"
+                            class="text-sm font-medium text-black truncate max-w-40"
                           >
                             {{ auction.name }}
                           </p>
@@ -916,7 +914,7 @@ function exportData() {
                         ]"
                       >
                         <span
-                          class="w-1.5 h-1.5 rounded-full flex-shrink-0"
+                          class="w-1.5 h-1.5 rounded-full shrink-0"
                           :class="statusBadge(auction.status).dot"
                         ></span>
                         {{ statusBadge(auction.status).label }}
@@ -1083,7 +1081,7 @@ function exportData() {
                   }"
                 ></div>
                 <div
-                  class="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent"
+                  class="absolute inset-0 bg-linear-to-t from-black/60 to-transparent"
                 ></div>
                 <button
                   @click="selectedAuction = null"
@@ -1146,7 +1144,7 @@ function exportData() {
                   </p>
                   <div class="flex items-center gap-2.5">
                     <div
-                      class="w-8 h-8 rounded-xl bg-gray-900 flex items-center justify-center text-white text-xs font-bold flex-shrink-0"
+                      class="w-8 h-8 rounded-xl bg-gray-900 flex items-center justify-center text-white text-xs font-bold shrink-0"
                     >
                       {{ selectedAuction.seller.charAt(0) }}
                     </div>
@@ -1271,7 +1269,7 @@ function exportData() {
                 >
                   <div class="flex items-center gap-2.5 min-w-0">
                     <div
-                      class="w-9 h-9 rounded-lg bg-cover bg-center bg-gray-200 flex-shrink-0"
+                      class="w-9 h-9 rounded-lg bg-cover bg-center bg-gray-200 shrink-0"
                       :style="{ backgroundImage: `url('${item.image}')` }"
                     ></div>
                     <div class="min-w-0">
@@ -1287,7 +1285,7 @@ function exportData() {
                     </div>
                   </div>
                   <span
-                    class="text-xs font-mono font-bold text-black flex-shrink-0 ml-2"
+                    class="text-xs font-mono font-bold text-black shrink-0 ml-2"
                     >{{ item.countdown }}</span
                   >
                 </div>
@@ -1318,11 +1316,11 @@ function exportData() {
                   "
                 >
                   <span
-                    class="text-xs font-bold text-gray-300 mt-1 w-4 flex-shrink-0"
+                    class="text-xs font-bold text-gray-300 mt-1 w-4 shrink-0"
                     >{{ String(i + 1).padStart(2, "0") }}</span
                   >
                   <div
-                    class="w-8 h-8 rounded-lg bg-cover bg-center bg-gray-200 flex-shrink-0"
+                    class="w-8 h-8 rounded-lg bg-cover bg-center bg-gray-200 shrink-0"
                     :style="{ backgroundImage: `url('${item.image}')` }"
                   ></div>
                   <div class="flex-1 min-w-0">
@@ -1397,7 +1395,7 @@ function exportData() {
             >
               <div class="flex items-center gap-3">
                 <div
-                  class="w-8 h-8 rounded-xl bg-gray-900 flex items-center justify-center text-white text-xs font-bold flex-shrink-0"
+                  class="w-8 h-8 rounded-xl bg-gray-900 flex items-center justify-center text-white text-xs font-bold shrink-0"
                 >
                   {{ bid.name.charAt(0) }}
                 </div>
