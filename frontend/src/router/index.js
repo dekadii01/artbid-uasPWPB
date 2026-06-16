@@ -15,6 +15,7 @@ import AdminUsersView from "../views/admin/users/Index.vue";
 import AdminCategoriesView from "../views/admin/categories/Index.vue";
 import AdminAuctionShowView from "../views/admin/auctions/Show.vue";
 import AdminUsersShowView from "../views/admin/users/Show.vue";
+import AdminReportsView from "../views/admin/reports/Index.vue";
 
 const routes = [
   {
@@ -109,6 +110,12 @@ const routes = [
         path: "categories",
         name: "AdminCategories",
         component: AdminCategoriesView,
+        meta: { layout: "admin" },
+      },
+      {
+        path: "reports",
+        name: "AdminReports",
+        component: AdminReportsView,
         meta: { layout: "admin" },
       },
     ],
