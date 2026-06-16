@@ -42,13 +42,13 @@ const routes = [
     path: "/auctions",
     name: "Auctions",
     component: AuctionIndexView,
-    meta: { layout: "app" },
+    meta: { layout: "app", requiresAuth: true },
   },
   {
     path: "/auction/:id",
     name: "AuctionShow",
     component: AuctionShowView,
-    meta: { layout: "app" },
+    meta: { layout: "app", requiresAuth: true },
   },
   {
     path: "/auction/create",
