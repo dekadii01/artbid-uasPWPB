@@ -1,3 +1,4 @@
+import { useAuthStore } from "../stores/auth";
 import { createRouter, createWebHistory } from "vue-router";
 import HomeView from "../views/HomeView.vue";
 import LoginView from "../views/LoginView.vue";
@@ -29,13 +30,13 @@ const routes = [
     path: "/login",
     name: "Login",
     component: LoginView,
-    meta: { layout: "default" },
+    meta: { layout: "default", guestOnly: true },
   },
   {
     path: "/register",
     name: "Register",
     component: RegisterView,
-    meta: { layout: "default" },
+    meta: { layout: "default", guestOnly: true },
   },
   {
     path: "/auctions",
@@ -53,29 +54,30 @@ const routes = [
     path: "/auction/create",
     name: "AuctionCreate",
     component: AuctionCreateView,
-    meta: { layout: "app" },
+    meta: { layout: "app", requiresAuth: true },
   },
   {
     path: "/my-bids",
     name: "MyBids",
     component: MyBidsView,
-    meta: { layout: "app" },
+    meta: { layout: "app", requiresAuth: true },
   },
   {
     path: "/watchlist",
     name: "Watchlist",
     component: WatchlistView,
-    meta: { layout: "app" },
+    meta: { layout: "app", requiresAuth: true },
   },
   {
     path: "/my-auctions",
     name: "MyAuctions",
     component: MyAuctionsView,
-    meta: { layout: "app" },
+    meta: { layout: "app", requiresAuth: true },
   },
   {
     path: "/admin",
     component: AdminLayout,
+    meta: { requiresAuth: true, requiresAdmin: true },
     children: [
       {
         path: "dashboard",
@@ -127,6 +129,11 @@ const routes = [
       },
     ],
   },
+
+  {
+    path: "/:pathMatch(.*)*",
+    redirect: "/",
+  },
 ];
 
 const router = createRouter({
@@ -143,6 +150,27 @@ const router = createRouter({
     if (savedPosition) return savedPosition;
     return { top: 0 };
   },
+});
+
+// ---------------------------------------------------------------------------
+// Navigation guard
+// beforeEach dipanggil SETELAH app.use(pinia) di main.js — jadi aman
+// ---------------------------------------------------------------------------
+
+router.beforeEach((to) => {
+  const auth = useAuthStore();
+
+  if (to.meta.requiresAuth && !auth.isLoggedIn) {
+    return { name: "Login", query: { redirect: to.fullPath } };
+  }
+
+  if (to.meta.requiresAdmin && !auth.isAdmin) {
+    return { name: "Home" };
+  }
+
+  if (to.meta.guestOnly && auth.isLoggedIn) {
+    return { name: "Home" };
+  }
 });
 
 export default router;
