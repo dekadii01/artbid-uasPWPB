@@ -154,13 +154,27 @@ const router = createRouter({
 
 // ---------------------------------------------------------------------------
 // Navigation guard
-// beforeEach dipanggil SETELAH app.use(pinia) di main.js — jadi aman
+//
+// Dengan fix di main.js (router dipasang SETELAH fetchUser selesai),
+// guard ini selalu berjalan dengan state auth yang sudah akurat.
+//
+// Namun kita tetap tambahkan safety check: jika token ada tapi user
+// belum ter-load (race condition edge case), tunggu fetchUser selesai
+// sebelum memutuskan redirect. Ini mencegah bug saat ada deep-link
+// yang diakses langsung via URL.
 // ---------------------------------------------------------------------------
 
-router.beforeEach((to) => {
+router.beforeEach(async (to) => {
   const auth = useAuthStore();
 
+  // Safety net: token ada tapi user belum ter-load
+  // (edge case jika ada navigasi yang terjadi sebelum fetchUser selesai)
+  if (auth.token && !auth.user) {
+    await auth.fetchUser();
+  }
+
   if (to.meta.requiresAuth && !auth.isLoggedIn) {
+    // Simpan tujuan asal agar setelah login bisa redirect ke sana
     return { name: "Login", query: { redirect: to.fullPath } };
   }
 
