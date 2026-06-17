@@ -1,5 +1,10 @@
 <script setup>
 import { ref, reactive, onMounted, onBeforeUnmount } from "vue";
+import { useRouter } from "vue-router";
+import { useAuthStore } from "../stores/auth";
+
+const router = useRouter();
+const auth = useAuthStore();
 
 // ─── Reactive state ───────────────────────────────────────────
 const form = reactive({
@@ -72,6 +77,12 @@ function validate() {
   return valid;
 }
 
+// ─── Clear per-field error saat user mulai mengetik ──────────
+function clearFieldError(field) {
+  fieldErrors[field] = "";
+  errorMessage.value = "";
+}
+
 // ─── Submit handler ──────────────────────────────────────────
 async function handleLogin() {
   errorMessage.value = "";
@@ -80,22 +91,40 @@ async function handleLogin() {
   isLoading.value = true;
 
   try {
-    // Replace with your actual API call, e.g.:
-    // const { data } = await axios.post('/api/login', form)
-    // router.push('/dashboard')
-
-    await new Promise((resolve) => setTimeout(resolve, 1500)); // demo delay
-    console.log("Login payload:", {
+    await auth.login({
       email: form.email,
       password: form.password,
-      remember: form.remember,
     });
 
-    window.location.href = "/auctions"; // Redirect to auctions page after successful login
-    // Example: uncomment below to simulate an auth error
-    // throw new Error('Email atau kata sandi tidak cocok.')
+    // Redirect berdasarkan role
+    if (auth.isAdmin) {
+      router.push("/admin/dashboard");
+    } else {
+      router.push("/auctions");
+    }
   } catch (err) {
-    errorMessage.value = err.message || "Terjadi kesalahan. Silakan coba lagi.";
+    const status = err.response?.status;
+    const data = err.response?.data;
+
+    if (status === 401) {
+      // Kredensial salah — tampil sebagai error umum, bukan field error,
+      // agar tidak memberi petunjuk field mana yang salah (best practice)
+      errorMessage.value = data?.message ?? "Email atau kata sandi salah.";
+    } else if (status === 422) {
+      // Validasi server-side — petakan ke fieldErrors
+      const serverErrors = data?.errors ?? {};
+      fieldErrors.email = serverErrors.email?.[0] ?? "";
+      fieldErrors.password = serverErrors.password?.[0] ?? "";
+
+      if (!fieldErrors.email && !fieldErrors.password) {
+        // Ada error 422 tapi bukan field yang dikenal
+        errorMessage.value = data?.message ?? "Data tidak valid.";
+      }
+    } else {
+      // Error jaringan atau server 5xx
+      errorMessage.value =
+        data?.message ?? "Terjadi kesalahan. Silakan coba lagi.";
+    }
   } finally {
     isLoading.value = false;
   }
@@ -158,6 +187,7 @@ onBeforeUnmount(() => {
           </p>
         </div>
 
+        <!-- Error message umum (401 / 5xx) -->
         <transition name="slide-fade">
           <div
             v-if="errorMessage"
@@ -181,6 +211,7 @@ onBeforeUnmount(() => {
         </transition>
 
         <form @submit.prevent="handleLogin" class="space-y-4 fade-up delay-2">
+          <!-- Email -->
           <div>
             <label class="text-xs text-gray-500 mb-1.5 block font-medium"
               >Alamat Email</label
@@ -191,6 +222,7 @@ onBeforeUnmount(() => {
                 type="email"
                 placeholder="kamu@email.com"
                 autocomplete="email"
+                @input="clearFieldError('email')"
                 :class="[
                   'w-full bg-white border rounded-lg pl-10 pr-4 py-3 text-sm outline-none transition-colors',
                   fieldErrors.email
@@ -212,11 +244,14 @@ onBeforeUnmount(() => {
                 />
               </svg>
             </div>
-            <p v-if="fieldErrors.email" class="text-gray-500 text-xs mt-1">
-              {{ fieldErrors.email }}
-            </p>
+            <transition name="slide-fade">
+              <p v-if="fieldErrors.email" class="text-gray-500 text-xs mt-1">
+                {{ fieldErrors.email }}
+              </p>
+            </transition>
           </div>
 
+          <!-- Password -->
           <div>
             <div class="flex items-center justify-between mb-1.5">
               <label class="text-xs text-gray-500 font-medium"
@@ -234,6 +269,7 @@ onBeforeUnmount(() => {
                 :type="showPassword ? 'text' : 'password'"
                 placeholder="Masukkan kata sandi"
                 autocomplete="current-password"
+                @input="clearFieldError('password')"
                 :class="[
                   'w-full bg-white border rounded-lg pl-10 pr-10 py-3 text-sm outline-none transition-colors',
                   fieldErrors.password
@@ -295,11 +331,14 @@ onBeforeUnmount(() => {
                 </svg>
               </button>
             </div>
-            <p v-if="fieldErrors.password" class="text-gray-500 text-xs mt-1">
-              {{ fieldErrors.password }}
-            </p>
+            <transition name="slide-fade">
+              <p v-if="fieldErrors.password" class="text-gray-500 text-xs mt-1">
+                {{ fieldErrors.password }}
+              </p>
+            </transition>
           </div>
 
+          <!-- Remember me -->
           <div class="flex items-center gap-2.5">
             <button
               type="button"
@@ -334,6 +373,7 @@ onBeforeUnmount(() => {
             </span>
           </div>
 
+          <!-- Submit button -->
           <button
             type="submit"
             :disabled="isLoading"
