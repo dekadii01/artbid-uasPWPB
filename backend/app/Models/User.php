@@ -14,8 +14,10 @@ class User extends Authenticatable
     use HasApiTokens, HasFactory, Notifiable;
 
     protected $fillable = [
-        'name',
+        'first_name',
+        'last_name',
         'email',
+        'phone',
         'password',
         'avatar',
         'role',
@@ -33,6 +35,19 @@ class User extends Authenticatable
             'password'          => 'hashed',
         ];
     }
+
+    /**
+     * Gabungan first_name + last_name untuk ditampilkan di frontend.
+     * Otomatis muncul di response JSON sebagai "full_name".
+     */
+    protected function fullName(): \Illuminate\Database\Eloquent\Casts\Attribute
+    {
+        return \Illuminate\Database\Eloquent\Casts\Attribute::make(
+            get: fn() => trim("{$this->first_name} {$this->last_name}"),
+        );
+    }
+
+    protected $appends = ['full_name'];
 
     // -----------------------------------------------------------------------
     // Role helpers

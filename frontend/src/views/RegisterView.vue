@@ -1,5 +1,10 @@
 <script setup>
 import { ref, reactive, computed } from "vue";
+import { useRouter } from "vue-router";
+import { useAuthStore } from "../stores/auth";
+
+const router = useRouter();
+const auth = useAuthStore();
 
 // ─── Constants ────────────────────────────────────────────────
 const totalSteps = 3;
@@ -69,12 +74,15 @@ const errorMessage = ref("");
 const showPassword = ref(false);
 const showConfirm = ref(false);
 
+// Catatan: field 'role' & checkbox 'agreeTerms/agreeAge/agreeNewsletter'
+// dihapus dari payload yang dikirim ke API — backend (tabel users)
+// tidak punya kolom untuk ini. Checkbox tetap ada di UI untuk consent,
+// tapi cukup divalidasi di frontend saja, tidak dikirim ke server.
 const form = reactive({
   firstName: "",
   lastName: "",
   email: "",
   phone: "",
-  role: "collector",
   password: "",
   confirmPassword: "",
   agreeTerms: false,
@@ -87,7 +95,6 @@ const fieldErrors = reactive({
   lastName: "",
   email: "",
   phone: "",
-  role: "",
   password: "",
   confirmPassword: "",
   agreeTerms: "",
@@ -179,10 +186,6 @@ function validateStep1() {
     fieldErrors.phone = "Format nomor telepon tidak valid.";
     ok = false;
   }
-  if (!form.role) {
-    fieldErrors.role = "Pilih salah satu peran.";
-    ok = false;
-  }
   return ok;
 }
 
@@ -238,24 +241,42 @@ async function handleRegister() {
 
   isLoading.value = true;
   try {
-    // Replace with your actual API call, e.g.:
-    // await axios.post('/api/register', { ...form })
-    // router.push('/verify-email')
-
-    await new Promise((resolve) => setTimeout(resolve, 1600)); // demo delay
-    console.log("Register payload:", { ...form });
+    // Mapping field UI -> field yang diharapkan API (lihat RegisterRequest):
+    // - confirmPassword (UI) -> password_confirmation (konvensi Laravel)
+    // - role & checkbox consent TIDAK dikirim, backend tidak punya kolomnya
+    await auth.register({
+      firstName: form.firstName,
+      lastName: form.lastName,
+      email: form.email,
+      phone: form.phone,
+      password: form.password,
+      password_confirmation: form.confirmPassword,
+    });
 
     currentStep.value = 4;
   } catch (err) {
-    errorMessage.value = err.message || "Terjadi kesalahan. Silakan coba lagi.";
+    if (err.response?.status === 422) {
+      // Error validasi dari Laravel — map per-field ke fieldErrors lokal
+      const errors = err.response.data.errors;
+
+      if (errors?.firstName) fieldErrors.firstName = errors.firstName[0];
+      if (errors?.lastName) fieldErrors.lastName = errors.lastName[0];
+      if (errors?.email) fieldErrors.email = errors.email[0];
+      if (errors?.phone) fieldErrors.phone = errors.phone[0];
+      if (errors?.password) fieldErrors.password = errors.password[0];
+
+      errorMessage.value = "Periksa kembali data yang kamu isi.";
+    } else {
+      errorMessage.value =
+        err.response?.data?.message || "Terjadi kesalahan. Silakan coba lagi.";
+    }
   } finally {
     isLoading.value = false;
   }
 }
 
 function goToDashboard() {
-  // router.push('/dashboard')
-  console.log("Redirect to dashboard");
+  router.push({ name: "Auctions" });
 }
 </script>
 
@@ -767,11 +788,6 @@ function goToDashboard() {
                     {{ form.firstName }} {{ form.lastName }}
                   </p>
                   <p class="text-gray-500 text-xs">{{ form.email }}</p>
-                  <span
-                    class="inline-block mt-1 bg-black text-white text-xs px-2.5 py-0.5 rounded-full"
-                  >
-                    {{ roleLabel }}
-                  </span>
                 </div>
               </div>
             </div>

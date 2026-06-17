@@ -35,7 +35,10 @@ class AuctionImage extends Model
      */
     public function getUrlAttribute(): string
     {
-        return Storage::disk($this->storage_disk)->url($this->image_path);
+        /** @var \Illuminate\Filesystem\FilesystemAdapter $disk */
+        $disk = Storage::disk($this->storage_disk);
+
+        return $disk->url($this->image_path);
     }
 
     protected $appends = ['url'];

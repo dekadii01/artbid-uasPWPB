@@ -1,3 +1,4 @@
+import { useAuthStore } from "../stores/auth";
 import { createRouter, createWebHistory } from "vue-router";
 import HomeView from "../views/HomeView.vue";
 import LoginView from "../views/LoginView.vue";
@@ -29,53 +30,54 @@ const routes = [
     path: "/login",
     name: "Login",
     component: LoginView,
-    meta: { layout: "default" },
+    meta: { layout: "default", guestOnly: true },
   },
   {
     path: "/register",
     name: "Register",
     component: RegisterView,
-    meta: { layout: "default" },
+    meta: { layout: "default", guestOnly: true },
   },
   {
     path: "/auctions",
     name: "Auctions",
     component: AuctionIndexView,
-    meta: { layout: "app" },
+    meta: { layout: "app", requiresAuth: true },
   },
   {
     path: "/auction/:id",
     name: "AuctionShow",
     component: AuctionShowView,
-    meta: { layout: "app" },
+    meta: { layout: "app", requiresAuth: true },
   },
   {
     path: "/auction/create",
     name: "AuctionCreate",
     component: AuctionCreateView,
-    meta: { layout: "app" },
+    meta: { layout: "app", requiresAuth: true },
   },
   {
     path: "/my-bids",
     name: "MyBids",
     component: MyBidsView,
-    meta: { layout: "app" },
+    meta: { layout: "app", requiresAuth: true },
   },
   {
     path: "/watchlist",
     name: "Watchlist",
     component: WatchlistView,
-    meta: { layout: "app" },
+    meta: { layout: "app", requiresAuth: true },
   },
   {
     path: "/my-auctions",
     name: "MyAuctions",
     component: MyAuctionsView,
-    meta: { layout: "app" },
+    meta: { layout: "app", requiresAuth: true },
   },
   {
     path: "/admin",
     component: AdminLayout,
+    meta: { requiresAuth: true, requiresAdmin: true },
     children: [
       {
         path: "dashboard",
@@ -127,6 +129,11 @@ const routes = [
       },
     ],
   },
+
+  {
+    path: "/:pathMatch(.*)*",
+    redirect: "/",
+  },
 ];
 
 const router = createRouter({
@@ -143,6 +150,41 @@ const router = createRouter({
     if (savedPosition) return savedPosition;
     return { top: 0 };
   },
+});
+
+// ---------------------------------------------------------------------------
+// Navigation guard
+//
+// Dengan fix di main.js (router dipasang SETELAH fetchUser selesai),
+// guard ini selalu berjalan dengan state auth yang sudah akurat.
+//
+// Namun kita tetap tambahkan safety check: jika token ada tapi user
+// belum ter-load (race condition edge case), tunggu fetchUser selesai
+// sebelum memutuskan redirect. Ini mencegah bug saat ada deep-link
+// yang diakses langsung via URL.
+// ---------------------------------------------------------------------------
+
+router.beforeEach(async (to) => {
+  const auth = useAuthStore();
+
+  // Safety net: token ada tapi user belum ter-load
+  // (edge case jika ada navigasi yang terjadi sebelum fetchUser selesai)
+  if (auth.token && !auth.user) {
+    await auth.fetchUser();
+  }
+
+  if (to.meta.requiresAuth && !auth.isLoggedIn) {
+    // Simpan tujuan asal agar setelah login bisa redirect ke sana
+    return { name: "Login", query: { redirect: to.fullPath } };
+  }
+
+  if (to.meta.requiresAdmin && !auth.isAdmin) {
+    return { name: "Home" };
+  }
+
+  if (to.meta.guestOnly && auth.isLoggedIn) {
+    return { name: "Home" };
+  }
 });
 
 export default router;
