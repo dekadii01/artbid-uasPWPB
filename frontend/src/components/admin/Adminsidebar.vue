@@ -1,6 +1,7 @@
 <script setup>
 import { ref, inject } from "vue";
 import { useRouter } from "vue-router";
+import { Icon } from "@iconify/vue";
 
 const router = useRouter();
 
@@ -59,6 +60,10 @@ const navGroups = [
 function handleLogout() {
   // TODO: panggil auth store logout
   router.push("/login");
+}
+
+function handleBerandaUser() {
+  router.push("/");
 }
 </script>
 
@@ -186,6 +191,19 @@ function handleLogout() {
 
     <!-- Bottom: collapse toggle + logout -->
     <div class="shrink-0 border-t border-gray-100 p-2 space-y-0.5">
+      <button
+        @click="handleBerandaUser"
+        :class="[
+          'w-full flex items-center gap-3 rounded-xl text-sm text-gray-500 hover:bg-gray-100 hover:text-black transition-all duration-200',
+          collapsed ? 'justify-center py-2.5' : 'px-3 py-2.5',
+        ]"
+        :title="collapsed ? 'Beranda User' : ''"
+      >
+        <Icon icon="mdi:home-outline" class="w-4 h-4 shrink-0" />
+        <transition name="label-fade">
+          <span v-if="!collapsed">Beranda User</span>
+        </transition>
+      </button>
       <!-- Logout -->
       <button
         @click="handleLogout"
