@@ -1,3 +1,115 @@
+<script setup>
+import { ref, computed, onMounted, onUnmounted, h } from "vue";
+import { useRouter } from "vue-router";
+import { useAuthStore } from "../stores/auth";
+
+const router = useRouter();
+const auth = useAuthStore();
+
+// ── State ──────────────────────────────────────────────────────────
+const profileOpen = ref(false);
+const mobileOpen = ref(false);
+const profileRef = ref(null);
+
+// ── User data — diambil langsung dari auth store ───────────────────
+// auth.user di-set otomatis saat login/register/fetchUser berhasil.
+const userName = computed(() => auth.user?.full_name ?? "");
+const userEmail = computed(() => auth.user?.email ?? "");
+
+const userInitials = computed(() =>
+  userName.value
+    .split(" ")
+    .filter(Boolean)
+    .map((w) => w[0])
+    .slice(0, 2)
+    .join("")
+    .toUpperCase(),
+);
+
+// ── Nav links ─────────────────────────────────────────────────────
+const navLinks = [
+  { label: "Daftar Lelang", to: "/auctions" },
+  { label: "Tawaran Saya", to: "/my-bids" },
+  { label: "Watchlist", to: "/watchlist" },
+  { label: "Karya Saya", to: "/my-auctions" },
+];
+
+// ── Profile dropdown menu ──────────────────────────────────────────
+const profileMenuItems = [
+  {
+    label: "Profil Saya",
+    to: "/profile",
+    icon: {
+      render: () =>
+        iconPath(
+          "M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z",
+        ),
+    },
+  },
+  {
+    label: "Riwayat Lelang",
+    to: "/history",
+    icon: {
+      render: () =>
+        iconPath(
+          "M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2",
+        ),
+    },
+  },
+  {
+    label: "Pengaturan",
+    to: "/settings",
+    icon: {
+      render: () =>
+        iconPath(
+          "M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z M15 12a3 3 0 11-6 0 3 3 0 016 0z",
+        ),
+    },
+  },
+];
+
+// SVG icon helper (renders inline SVG via Vue render fn)
+function iconPath(d) {
+  return h(
+    "svg",
+    {
+      class: "w-4 h-4",
+      fill: "none",
+      stroke: "currentColor",
+      viewBox: "0 0 24 24",
+    },
+    [
+      h("path", {
+        "stroke-linecap": "round",
+        "stroke-linejoin": "round",
+        "stroke-width": "2",
+        d,
+      }),
+    ],
+  );
+}
+
+// ── Logout ────────────────────────────────────────────────────────
+async function handleLogout() {
+  profileOpen.value = false;
+  mobileOpen.value = false;
+
+  // Cabut token di server + bersihkan state lokal (lihat stores/auth.js)
+  await auth.logout();
+
+  router.push("/login");
+}
+
+// ── Click-outside to close dropdown ───────────────────────────────
+function handleClickOutside(e) {
+  if (profileRef.value && !profileRef.value.contains(e.target)) {
+    profileOpen.value = false;
+  }
+}
+onMounted(() => document.addEventListener("click", handleClickOutside));
+onUnmounted(() => document.removeEventListener("click", handleClickOutside));
+</script>
+
 <template>
   <nav
     class="fixed top-0 left-0 right-0 z-50 bg-white border-b border-gray-100"
@@ -267,111 +379,6 @@
     </transition>
   </nav>
 </template>
-
-<script setup>
-import { ref, computed, onMounted, onUnmounted } from "vue";
-import { useRouter } from "vue-router";
-
-const router = useRouter();
-
-// ── State ──────────────────────────────────────────────────────────
-const profileOpen = ref(false);
-const mobileOpen = ref(false);
-const profileRef = ref(null);
-
-// ── User data — ganti dengan store/auth kamu ──────────────────────
-const userName = ref("Budi Santoso");
-const userEmail = ref("budi@email.com");
-const userInitials = computed(() =>
-  userName.value
-    .split(" ")
-    .map((w) => w[0])
-    .slice(0, 2)
-    .join("")
-    .toUpperCase(),
-);
-
-// ── Nav links ─────────────────────────────────────────────────────
-const navLinks = [
-  { label: "Daftar Lelang", to: "/auctions" },
-  { label: "Tawaran Saya", to: "/my-bids" },
-  { label: "Watchlist", to: "/watchlist" },
-  { label: "Karya Saya", to: "/my-auctions" },
-];
-
-// ── Profile dropdown menu ──────────────────────────────────────────
-const profileMenuItems = [
-  {
-    label: "Profil Saya",
-    to: "/profile",
-    icon: {
-      render: () =>
-        iconPath(
-          "M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z",
-        ),
-    },
-  },
-  {
-    label: "Riwayat Lelang",
-    to: "/history",
-    icon: {
-      render: () =>
-        iconPath(
-          "M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2",
-        ),
-    },
-  },
-  {
-    label: "Pengaturan",
-    to: "/settings",
-    icon: {
-      render: () =>
-        iconPath(
-          "M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z M15 12a3 3 0 11-6 0 3 3 0 016 0z",
-        ),
-    },
-  },
-];
-
-// SVG icon helper (renders inline SVG via Vue render fn)
-import { h } from "vue";
-function iconPath(d) {
-  return h(
-    "svg",
-    {
-      class: "w-4 h-4",
-      fill: "none",
-      stroke: "currentColor",
-      viewBox: "0 0 24 24",
-    },
-    [
-      h("path", {
-        "stroke-linecap": "round",
-        "stroke-linejoin": "round",
-        "stroke-width": "2",
-        d,
-      }),
-    ],
-  );
-}
-
-// ── Logout ────────────────────────────────────────────────────────
-function handleLogout() {
-  profileOpen.value = false;
-  mobileOpen.value = false;
-  // TODO: panggil auth store logout kamu di sini, lalu redirect
-  router.push("/login");
-}
-
-// ── Click-outside to close dropdown ───────────────────────────────
-function handleClickOutside(e) {
-  if (profileRef.value && !profileRef.value.contains(e.target)) {
-    profileOpen.value = false;
-  }
-}
-onMounted(() => document.addEventListener("click", handleClickOutside));
-onUnmounted(() => document.removeEventListener("click", handleClickOutside));
-</script>
 
 <style scoped>
 /* Pastikan DM Sans sudah di-import global di project kamu */
