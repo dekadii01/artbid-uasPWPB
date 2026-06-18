@@ -29,6 +29,12 @@ class BuyNowController extends Controller
                 // Lock data lelang agar tidak bertabrakan dengan bid lain
                 $lockedAuction = Auction::lockForUpdate()->findOrFail($auction->id);
 
+                // Auto-start if starts_at is reached/passed
+                if ($lockedAuction->status === 'scheduled' && $lockedAuction->starts_at && $lockedAuction->starts_at->isPast()) {
+                    $lockedAuction->status = 'active';
+                    $lockedAuction->save();
+                }
+
                 if ($lockedAuction->status !== 'active') {
                     return [
                         'success' => false,

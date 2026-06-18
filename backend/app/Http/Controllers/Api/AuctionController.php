@@ -31,6 +31,9 @@ class AuctionController extends Controller
      */
     public function index(Request $request): JsonResponse
     {
+        // Auto-start any scheduled auctions whose starts_at time has passed
+        Auction::dueToStart()->update(['status' => 'active']);
+
         $query = Auction::with(['seller:id,first_name,last_name', 'mainImage'])
             ->withCount('bids');
 
@@ -106,6 +109,11 @@ class AuctionController extends Controller
      */
     public function show(Auction $auction): JsonResponse
     {
+        if ($auction->status === 'scheduled' && $auction->starts_at && $auction->starts_at->isPast()) {
+            $auction->update(['status' => 'active']);
+            $auction->status = 'active'; // keep in-memory model updated
+        }
+
         $auction->load([
             'seller:id,first_name,last_name,email,avatar,created_at',
             'images',
