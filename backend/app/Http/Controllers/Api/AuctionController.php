@@ -7,6 +7,7 @@ use App\Http\Requests\StoreAuctionRequest;
 use App\Models\Auction;
 use App\Models\AuctionImage;
 use Illuminate\Http\JsonResponse;
+use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
@@ -14,38 +15,115 @@ use Illuminate\Support\Str;
 class AuctionController extends Controller
 {
     /**
-     * Daftar lelang aktif (publik, tidak perlu login).
+     * Daftar lelang (publik, tidak perlu login).
+     *
+     * Query params yang didukung:
+     *   ?status=active|scheduled|ended   → filter per status
+     *   ?category=Lukisan                → filter per kategori
+     *   ?search=keyword                  → cari judul/deskripsi
+     *   ?sort=latest|price_high|price_low|ending_soon|most_bids
+     *   ?per_page=12
+     *
+     * Frontend pakai status:
+     *   "live"     → backend: "active"
+     *   "upcoming" → backend: "scheduled"
+     *   "ended"    → backend: "ended"
      */
-    public function index(): JsonResponse
+    public function index(Request $request): JsonResponse
     {
-        $auctions = Auction::with(['seller', 'mainImage'])
-            ->active()
-            ->latest()
-            ->paginate(12);
+        $query = Auction::with(['seller:id,first_name,last_name', 'mainImage'])
+            ->withCount('bids');
+
+        // ── Status filter ────────────────────────────────────────────
+        // Map status dari frontend ke backend
+        $statusMap = [
+            'live'     => 'active',
+            'upcoming' => 'scheduled',
+            'ended'    => 'ended',
+            // Kalau sudah kirim nilai backend langsung, tetap jalan
+            'active'    => 'active',
+            'scheduled' => 'scheduled',
+        ];
+
+        if ($request->filled('status') && $request->status !== 'all') {
+            $backendStatus = $statusMap[$request->status] ?? $request->status;
+            $query->where('status', $backendStatus);
+        }
+        // Kalau tidak ada filter status / status=all → tampilkan semua
+
+        // ── Category filter ──────────────────────────────────────────
+        if ($request->filled('category')) {
+            $query->where('category', $request->category);
+        }
+
+        // ── Search ───────────────────────────────────────────────────
+        if ($request->filled('search')) {
+            $q = $request->search;
+            $query->where(function ($q2) use ($q) {
+                $q2->where('title', 'like', "%{$q}%")
+                    ->orWhere('description', 'like', "%{$q}%");
+            });
+        }
+
+        // ── Sort ─────────────────────────────────────────────────────
+        switch ($request->sort) {
+            case 'price_high':
+                $query->orderByDesc('current_price');
+                break;
+            case 'price_low':
+                $query->orderBy('current_price');
+                break;
+            case 'ending_soon':
+                // Prioritaskan yang aktif dan hampir habis
+                $query->orderByRaw("FIELD(status, 'active', 'scheduled', 'ended')")
+                    ->orderBy('ends_at');
+                break;
+            case 'most_bids':
+                $query->orderByDesc('bids_count');
+                break;
+            default: // latest
+                $query->latest();
+                break;
+        }
+
+        $perPage = min((int) $request->get('per_page', 12), 50);
+        $auctions = $query->paginate($perPage);
+
+        // ── Transform: map field backend → frontend ──────────────────
+        $auctions->getCollection()->transform(function (Auction $auction) {
+            return $this->transformAuction($auction);
+        });
 
         return response()->json($auctions);
     }
 
     /**
+     * Detail satu lelang (publik).
+     */
+    public function show(Auction $auction): JsonResponse
+    {
+        $auction->load(['seller', 'images', 'bids.bidder']);
+
+        return response()->json(['auction' => $auction]);
+    }
+
+    /**
      * Buat lelang baru beserta upload foto.
-     * Disk penyimpanan ditentukan oleh FILESYSTEM_DISK di .env (harus 'r2').
      */
     public function store(StoreAuctionRequest $request): JsonResponse
     {
         $validated = $request->validated();
-
-        // PENTING: pastikan FILESYSTEM_DISK=r2 di .env, baru disk ini
-        // benar-benar mengarah ke bucket R2. Kalau masih 'local', foto
-        // akan tersimpan di server, bukan di R2.
         $disk = config('filesystems.default');
 
         $auction = DB::transaction(function () use ($validated, $request, $disk) {
-
-            // ── Simpan data lelang ──────────────────────────────────
             $auction = Auction::create([
                 'seller_id'      => $request->user()->id,
                 'title'          => $validated['title'],
                 'description'    => $validated['description'],
+                'category'       => $validated['category'],
+                'condition'      => $validated['condition'] ?? null,
+                'artist'         => $validated['artist'] ?? null,
+                'year'           => $validated['year'] ?? null,
                 'starting_price' => $validated['starting_price'],
                 'current_price'  => $validated['starting_price'],
                 'bid_increment'  => $validated['bid_increment'],
@@ -55,10 +133,8 @@ class AuctionController extends Controller
                 'ends_at'        => $validated['ends_at'],
             ]);
 
-            // ── Upload foto utama (sort_order = 0) ──────────────────
             $this->storeImage($request->file('main_photo'), $auction, $disk, 0);
 
-            // ── Upload foto tambahan (sort_order = 1, 2, 3, ...) ────
             if ($request->hasFile('extra_photos')) {
                 foreach ($request->file('extra_photos') as $index => $file) {
                     $this->storeImage($file, $auction, $disk, $index + 1);
@@ -77,16 +153,6 @@ class AuctionController extends Controller
     }
 
     /**
-     * Detail satu lelang (publik).
-     */
-    public function show(Auction $auction): JsonResponse
-    {
-        $auction->load(['seller', 'images', 'bids.bidder']);
-
-        return response()->json(['auction' => $auction]);
-    }
-
-    /**
      * Lelang milik seller yang sedang login.
      */
     public function myAuctions(): JsonResponse
@@ -94,30 +160,59 @@ class AuctionController extends Controller
         $auctions = auth()->user()
             ->auctions()
             ->with(['mainImage', 'winner.winner'])
+            ->withCount('bids')
             ->latest()
             ->paginate(12);
+
+        $auctions->getCollection()->transform(fn($a) => $this->transformAuction($a));
 
         return response()->json($auctions);
     }
 
     /**
-     * Helper: upload satu file foto ke disk aktif dan simpan record-nya.
+     * Transform satu Auction model → array siap pakai di frontend.
      *
-     * PERBAIKAN dari versi sebelumnya:
-     * 1. Pakai $file->get() bukan file_get_contents($file) — method
-     *    bawaan UploadedFile, lebih aman & efisien.
-     * 2. Tambah ['visibility' => 'public'] — WAJIB untuk R2, supaya file
-     *    bisa diakses lewat URL publik (r2.dev / custom domain). Tanpa ini,
-     *    file ter-upload tapi browser akan dapat 403 saat mengakses URL-nya.
+     * Status mapping: scheduled → upcoming, active → live, ended → ended
+     */
+    private function transformAuction(Auction $auction): array
+    {
+        $statusMap = [
+            'scheduled' => 'upcoming',
+            'active'    => 'live',
+            'ended'     => 'ended',
+        ];
+
+        // URL foto utama — pakai accessor 'url' dari AuctionImage model
+        $mainImageUrl = $auction->mainImage?->url ?? null;
+
+        return [
+            'id'           => $auction->id,
+            'name'         => $auction->title,
+            'category'     => $auction->category,
+            'description'  => $auction->description,
+            'seller'       => $auction->seller?->full_name,
+            'seller_id'    => $auction->seller_id,
+            'currentPrice' => (float) $auction->current_price,
+            'startPrice'   => (float) $auction->starting_price,
+            'bidCount'     => $auction->bids_count ?? 0,
+            'photoCount'   => $auction->images_count ?? 1,
+            'image'        => $mainImageUrl,
+            'status'       => $statusMap[$auction->status] ?? $auction->status,
+            'startsAt'     => $auction->starts_at?->toIso8601String(),
+            'endsAt'       => $auction->ends_at?->toIso8601String(),
+            'createdAt'    => $auction->created_at?->toIso8601String(),
+        ];
+    }
+
+    /**
+     * Helper: upload satu file foto ke disk aktif.
      */
     private function storeImage($file, Auction $auction, string $disk, int $sortOrder): AuctionImage
     {
         $filename = Str::uuid() . '.' . $file->getClientOriginalExtension();
         $path = "auctions/{$auction->id}/{$filename}";
 
-        Storage::disk($disk)->put($path, $file->get(), [
-            'visibility' => 'public',
-        ]);
+        Storage::disk($disk)->put($path, file_get_contents($file));
 
         return AuctionImage::create([
             'auction_id'   => $auction->id,
