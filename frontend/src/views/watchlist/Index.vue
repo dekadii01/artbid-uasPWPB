@@ -1,176 +1,83 @@
 <script setup>
-import { ref, computed } from "vue";
+import { ref, computed, onMounted } from "vue";
+import { getWatchlist, toggleWatchlist } from "../../api/auctions";
 
-// ─── Stats ───────────────────────────────────────────────────
-const stats = [
+// ─── State ────────────────────────────────────────────────────
+const watchlist = ref([]);
+const isLoading = ref(true);
+const isError = ref(false);
+
+const stats = ref([
   {
     label: "Total Watchlist",
-    value: "24",
+    value: "0",
     icon: "M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z",
     dark: false,
   },
   {
     label: "Sedang Berlangsung",
-    value: "15",
+    value: "0",
     icon: "M13 10V3L4 14h7v7l9-11h-7z",
     dark: true,
   },
   {
     label: "Akan Datang",
-    value: "6",
+    value: "0",
     icon: "M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z",
     dark: false,
   },
   {
-    label: "Segera Berakhir",
-    value: "3",
+    label: "Selesai",
+    value: "0",
     icon: "M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z",
     dark: false,
   },
-];
-
-// ─── Ending soon strip ───────────────────────────────────────
-const endingSoon = ref([
-  {
-    id: 1,
-    name: "Lukisan Bali Klasik Tahun 1980",
-    category: "Lukisan",
-    image:
-      "https://images.unsplash.com/photo-1541701494587-cb58502866ab?w=600&q=80",
-    currentPrice: 12500000,
-    countdown: "00:25:08",
-  },
-  {
-    id: 4,
-    name: "Topeng Barong Antik",
-    category: "Kerajinan",
-    image:
-      "https://images.unsplash.com/photo-1567359781514-3b964e2b04d6?w=600&q=80",
-    currentPrice: 8750000,
-    countdown: "00:09:45",
-  },
-  {
-    id: 5,
-    name: "Patung Dewi Saraswati",
-    category: "Patung",
-    image:
-      "https://images.unsplash.com/photo-1578926288207-32356f3e5e93?w=600&q=80",
-    currentPrice: 6200000,
-    countdown: "00:17:33",
-  },
 ]);
 
+// ─── Fetch watchlist ──────────────────────────────────────────
+async function fetchWatchlist() {
+  isLoading.value = true;
+  isError.value = false;
+  try {
+    const { data } = await getWatchlist();
+    watchlist.value = data.data ?? [];
+
+    // Update stats
+    stats.value[0].value = String(watchlist.value.length);
+    stats.value[1].value = String(watchlist.value.filter((i) => i.status === "live" || i.status === "active").length);
+    stats.value[2].value = String(watchlist.value.filter((i) => i.status === "upcoming").length);
+    stats.value[3].value = String(watchlist.value.filter((i) => i.status === "ended").length);
+  } catch (err) {
+    console.error("Gagal fetch watchlist:", err);
+    isError.value = true;
+  } finally {
+    isLoading.value = false;
+  }
+}
+
+onMounted(() => {
+  fetchWatchlist();
+});
+
+// ─── Ending soon strip ───────────────────────────────────────
+const endingSoon = computed(() => {
+  // Ambil item aktif yang tersisa sedikit waktu
+  return watchlist.value
+    .filter((i) => i.status === "live" || i.status === "active")
+    .slice(0, 3);
+});
+
 // ─── Filters ─────────────────────────────────────────────────
-const filters = [
-  { label: "Semua", value: "all", count: 24 },
-  { label: "Sedang Berlangsung", value: "active", count: 15 },
-  { label: "Akan Datang", value: "upcoming", count: 6 },
-  { label: "Selesai", value: "ended", count: 3 },
-];
+const filters = computed(() => [
+  { label: "Semua", value: "all", count: watchlist.value.length },
+  { label: "Sedang Berlangsung", value: "active", count: watchlist.value.filter((i) => i.status === "live" || i.status === "active").length },
+  { label: "Akan Datang", value: "upcoming", count: watchlist.value.filter((i) => i.status === "upcoming").length },
+  { label: "Selesai", value: "ended", count: watchlist.value.filter((i) => i.status === "ended").length },
+]);
 
 const activeFilter = ref("all");
 const search = ref("");
 const sortBy = ref("newest");
-
-// ─── Watchlist items ─────────────────────────────────────────
-const watchlist = ref([
-  {
-    id: 1,
-    name: "Patung Garuda Bali",
-    artist: "Ketut Suardana",
-    category: "Patung",
-    image:
-      "https://images.unsplash.com/photo-1578926288207-32356f3e5e93?w=600&q=80",
-    currentPrice: 8500000,
-    totalBids: 25,
-    watching: 18,
-    hasBid: false,
-    status: "active",
-    timeLeft: { d: "01", h: "05", m: "12" },
-    endDate: "",
-    addedAt: 1,
-  },
-  {
-    id: 2,
-    name: "Lukisan Bali Klasik Tahun 1980",
-    artist: "I Wayan Sukerta",
-    category: "Lukisan",
-    image:
-      "https://images.unsplash.com/photo-1541701494587-cb58502866ab?w=600&q=80",
-    currentPrice: 12500000,
-    totalBids: 35,
-    watching: 42,
-    hasBid: true,
-    status: "active",
-    timeLeft: { d: "00", h: "00", m: "25" },
-    endDate: "",
-    addedAt: 2,
-  },
-  {
-    id: 3,
-    name: "Topeng Tradisional Bali",
-    artist: "Ni Luh Eka Sari",
-    category: "Kerajinan",
-    image:
-      "https://images.unsplash.com/photo-1567359781514-3b964e2b04d6?w=600&q=80",
-    currentPrice: 4200000,
-    totalBids: 11,
-    watching: 9,
-    hasBid: false,
-    status: "upcoming",
-    timeLeft: { d: "00", h: "03", m: "25" },
-    endDate: "",
-    addedAt: 3,
-  },
-  {
-    id: 4,
-    name: "Ukiran Kayu Garuda",
-    artist: "Dewa Gede Artana",
-    category: "Patung",
-    image:
-      "https://images.unsplash.com/photo-1460661419201-fd4cecdf8a8b?w=600&q=80",
-    currentPrice: 18000000,
-    totalBids: 48,
-    watching: 63,
-    hasBid: true,
-    status: "active",
-    timeLeft: { d: "02", h: "11", m: "40" },
-    endDate: "",
-    addedAt: 4,
-  },
-  {
-    id: 5,
-    name: "Harmoni Semesta",
-    artist: "I Made Wijaya",
-    category: "Lukisan",
-    image:
-      "https://images.unsplash.com/photo-1513364776144-60967b0f800f?w=600&q=80",
-    currentPrice: 19200000,
-    totalBids: 52,
-    watching: 77,
-    hasBid: false,
-    status: "ended",
-    timeLeft: null,
-    endDate: "12 Juni 2026",
-    addedAt: 5,
-  },
-  {
-    id: 6,
-    name: "Alam Tak Terbatas",
-    artist: "Sang Ayu Putu Riani",
-    category: "Lukisan Batik",
-    image:
-      "https://images.unsplash.com/photo-1565193566173-7a0ee3dbe261?w=600&q=80",
-    currentPrice: 7800000,
-    totalBids: 19,
-    watching: 24,
-    hasBid: false,
-    status: "upcoming",
-    timeLeft: { d: "00", h: "07", m: "50" },
-    endDate: "",
-    addedAt: 6,
-  },
-]);
 
 // ─── Filtered + sorted list ──────────────────────────────────
 const filteredList = computed(() => {
@@ -181,13 +88,17 @@ const filteredList = computed(() => {
     list = list.filter(
       (i) =>
         i.name.toLowerCase().includes(q) ||
-        i.artist.toLowerCase().includes(q) ||
-        i.category.toLowerCase().includes(q),
+        (i.artist && i.artist.toLowerCase().includes(q)) ||
+        (i.category && i.category.toLowerCase().includes(q)),
     );
   }
 
   if (activeFilter.value !== "all") {
-    list = list.filter((i) => i.status === activeFilter.value);
+    if (activeFilter.value === "active") {
+      list = list.filter((i) => i.status === "live" || i.status === "active");
+    } else {
+      list = list.filter((i) => i.status === activeFilter.value);
+    }
   }
 
   if (sortBy.value === "price_high")
@@ -201,22 +112,28 @@ const filteredList = computed(() => {
       (a, b) =>
         (a.status === "active" ? -1 : 1) - (b.status === "active" ? -1 : 1),
     );
-  else list.sort((a, b) => a.addedAt - b.addedAt);
+  else list.sort((a, b) => b.addedAt - a.addedAt);
 
   return list;
 });
 
 // ─── Remove from watchlist ───────────────────────────────────
-function removeFromWatchlist(id) {
-  watchlist.value = watchlist.value.filter((i) => i.id !== id);
+const isToggling = ref(false);
+async function removeFromWatchlist(id) {
+  if (isToggling.value) return;
+  isToggling.value = true;
+  try {
+    await toggleWatchlist(id);
+    watchlist.value = watchlist.value.filter((i) => i.id !== id);
+    await fetchWatchlist();
+  } catch (err) {
+    console.error("Gagal hapus dari watchlist:", err);
+  } finally {
+    isToggling.value = false;
+  }
 }
 
-function addToWatchlist(id) {
-  // TODO: API call to add to watchlist
-  console.log("Add to watchlist:", id);
-}
-
-// ─── Price activity feed ─────────────────────────────────────
+// ─── Price activity feed (Simulasi/Mock) ─────────────────────
 const priceActivities = [
   {
     type: "price",
@@ -233,66 +150,21 @@ const priceActivities = [
     text: 'Lelang <strong class="text-black">"Ukiran Kayu Garuda"</strong> akan dimulai dalam 1 jam',
     time: "1 jam yang lalu",
   },
-  {
-    type: "price",
-    text: 'Harga <strong class="text-black">"Harmoni Semesta"</strong> naik menjadi <strong class="text-black">Rp 19.200.000</strong>',
-    time: "2 jam yang lalu",
-  },
-  {
-    type: "bids",
-    text: 'Lelang <strong class="text-black">"Lukisan Bali Klasik"</strong> menerima 12 penawaran baru dalam 30 menit terakhir',
-    time: "3 jam yang lalu",
-  },
 ];
 
 // ─── Category breakdown ──────────────────────────────────────
-const categoryBreakdown = [
-  { label: "Lukisan", count: 9, pct: 75 },
-  { label: "Patung", count: 7, pct: 58 },
-  { label: "Kerajinan", count: 5, pct: 42 },
-  { label: "Fotografi", count: 2, pct: 17 },
-  { label: "Lukisan Batik", count: 1, pct: 8 },
-];
-
-// ─── Recommendations ─────────────────────────────────────────
-const recommendations = ref([
-  {
-    id: 10,
-    name: "Sunrise Penida",
-    category: "Fotografi",
-    image:
-      "https://images.unsplash.com/photo-1519125323398-675f0ddb6308?w=400&q=80",
-    startPrice: 5000000,
-    status: "active",
-  },
-  {
-    id: 11,
-    name: "Tanah & Api",
-    category: "Keramik",
-    image:
-      "https://images.unsplash.com/photo-1565193566173-7a0ee3dbe261?w=400&q=80",
-    startPrice: 3500000,
-    status: "upcoming",
-  },
-  {
-    id: 12,
-    name: "Jejak Digital",
-    category: "Instalasi",
-    image:
-      "https://images.unsplash.com/photo-1578301978018-3005759f48f7?w=400&q=80",
-    startPrice: 35000000,
-    status: "upcoming",
-  },
-  {
-    id: 13,
-    name: "Dewi Kesuburan",
-    category: "Patung",
-    image:
-      "https://images.unsplash.com/photo-1460661419201-fd4cecdf8a8b?w=400&q=80",
-    startPrice: 18000000,
-    status: "active",
-  },
-]);
+const categoryBreakdown = computed(() => {
+  const counts = {};
+  watchlist.value.forEach((i) => {
+    counts[i.category] = (counts[i.category] ?? 0) + 1;
+  });
+  const total = watchlist.value.length || 1;
+  return Object.keys(counts).map((cat) => ({
+    label: cat,
+    count: counts[cat],
+    pct: Math.round((counts[cat] / total) * 100),
+  })).sort((a, b) => b.count - a.count);
+});
 
 // ─── Helpers ─────────────────────────────────────────────────
 function formatRp(val) {
@@ -302,6 +174,11 @@ function formatRp(val) {
 function statusBadge(status) {
   const map = {
     active: {
+      class: "bg-white/90 backdrop-blur-sm text-gray-800",
+      dot: "bg-gray-800",
+      label: "Berlangsung",
+    },
+    live: {
       class: "bg-white/90 backdrop-blur-sm text-gray-800",
       dot: "bg-gray-800",
       label: "Berlangsung",
@@ -318,27 +195,6 @@ function statusBadge(status) {
     },
   };
   return map[status] ?? map.ended;
-}
-
-function activityStyle(type) {
-  const map = {
-    price: {
-      bg: "bg-black",
-      icon: "text-white",
-      path: "M13 7h8m0 0V3m0 4l-8 8-4-4-6 6",
-    },
-    bids: {
-      bg: "bg-gray-100",
-      icon: "text-gray-700",
-      path: "M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z",
-    },
-    upcoming: {
-      bg: "bg-gray-100",
-      icon: "text-gray-500",
-      path: "M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z",
-    },
-  };
-  return map[type] ?? map.bids;
 }
 </script>
 
@@ -462,7 +318,7 @@ function activityStyle(type) {
               </div>
               <button
                 class="px-3 py-2 border border-gray-200 text-gray-600 rounded-lg text-xs font-medium hover:border-black hover:text-black transition-all duration-300"
-                @click="$router.push(`/auctions/${item.id}`)"
+                @click="$router.push(`/auction/${item.id}`)"
               >
                 Lihat Detail
               </button>
@@ -790,7 +646,7 @@ function activityStyle(type) {
               <!-- Actions -->
               <div class="flex gap-2 mt-auto">
                 <button
-                  @click="$router.push(`/auctions/${item.id}`)"
+                  @click="$router.push(`/auction/${item.id}`)"
                   class="flex-1 py-2.5 border border-gray-200 text-gray-700 rounded-lg text-xs font-medium hover:border-black hover:text-black transition-all duration-300"
                 >
                   Lihat Detail

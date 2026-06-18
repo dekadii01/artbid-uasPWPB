@@ -2,7 +2,12 @@
 import { ref, computed, onMounted, onUnmounted } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import { Icon } from "@iconify/vue";
-import { getAuction } from "../../api/auctions";
+import {
+  getAuction,
+  placeBid as placeBidApi,
+  buyNow as buyNowApi,
+  toggleWatchlist as toggleWatchlistApi
+} from "../../api/auctions";
 
 const route = useRoute();
 const router = useRouter();
@@ -48,6 +53,48 @@ async function fetchAuction() {
       (data.auction.currentPrice ?? data.auction.startPrice) +
       (data.auction.minIncrement ?? 0);
     bidAmount.value = minB;
+
+    // Set watchlist status
+    watchlisted.value = data.auction.isWatchlisted;
+
+    // Populate activity feed from bids
+    if (data.auction.bids && data.auction.bids.length > 0) {
+      activityFeed.value = data.auction.bids.map((b) => ({
+        id: b.id,
+        icon: "mdi:gavel",
+        text: `${b.user} mengajukan penawaran ${formatRupiah(b.amount)}`,
+        time: b.time,
+      }));
+
+      // Compute user bid status
+      const hasUserBid = data.auction.bids.some((b) => b.user === "Anda");
+      const isUserLeading = data.auction.bids[0].user === "Anda";
+
+      if (data.auction.status === "ended") {
+        userBidStatus.value = isUserLeading
+          ? "leading"
+          : hasUserBid
+            ? "outbid"
+            : "none";
+      } else {
+        userBidStatus.value = isUserLeading
+          ? "leading"
+          : hasUserBid
+            ? "outbid"
+            : "none";
+      }
+    } else {
+      activityFeed.value = [];
+      userBidStatus.value = "none";
+    }
+    // Jika lelang berakhir dan user menang (winner info ada)
+    if (data.auction.status === "ended" && data.auction.winner) {
+      // Cek apakah winner name terdeteksi dari user profile,
+      // tapi status leading/won bisa disesuaikan
+      if (userBidStatus.value === "leading") {
+        userBidStatus.value = "won";
+      }
+    }
   } catch (err) {
     console.error("Gagal fetch auction:", err);
     isError.value = true;
@@ -59,7 +106,7 @@ async function fetchAuction() {
 onMounted(() => {
   fetchAuction();
 
-  // Simulasi viewer fluctuation (nanti diganti presence channel Reverb)
+  // Simulasi viewer fluctuation
   setInterval(() => {
     const delta = Math.random() > 0.5 ? 1 : -1;
     viewers.value = Math.max(5, Math.min(40, viewers.value + delta));
@@ -126,9 +173,9 @@ const bidAmount = ref(null);
 const bidError = ref("");
 const isBidding = ref(false);
 const viewers = ref(18);
-const userBidStatus = ref("none"); // 'none' | 'leading' | 'outbid' | 'won'
+const userBidStatus = ref("none"); // 'none' | 'leading' | 'outbid' | 'won' | 'lost'
 
-// ─── Activity feed (nanti dari Reverb) ───────────────────────────
+// ─── Activity feed ───────────────────────────────────────────────
 const activityFeed = ref([]);
 
 // ─── Notifications ────────────────────────────────────────────────
@@ -142,8 +189,29 @@ function addNotif(message, type = "success", icon = "mdi:bell") {
   }, 4000);
 }
 
-// ─── Bid logic (TODO: sambung ke POST /api/auctions/{id}/bids) ───
-function placeBid() {
+// ─── Watchlist toggle ─────────────────────────────────────────────
+const isTogglingWatchlist = ref(false);
+async function handleToggleWatchlist() {
+  if (isTogglingWatchlist.value) return;
+  isTogglingWatchlist.value = true;
+  try {
+    const { data } = await toggleWatchlistApi(auction.value.id);
+    watchlisted.value = data.watchlisted;
+    addNotif(
+      data.watchlisted ? "Ditambahkan ke Watchlist" : "Dihapus dari Watchlist",
+      "success",
+      data.watchlisted ? "mdi:heart" : "mdi:heart-off"
+    );
+  } catch (err) {
+    console.error("Gagal toggle watchlist:", err);
+    addNotif("Gagal merubah watchlist", "warning", "mdi:alert-circle");
+  } finally {
+    isTogglingWatchlist.value = false;
+  }
+}
+
+// ─── Bid logic ───────────────────────────────────────────────────
+async function placeBid() {
   bidError.value = "";
   const amount = Number(bidAmount.value);
   if (!amount || amount < minBid.value) {
@@ -152,37 +220,47 @@ function placeBid() {
   }
   isBidding.value = true;
 
-  // TODO: ganti dengan API call
-  // await placeBidApi(auction.value.id, { amount })
-  setTimeout(() => {
-    const newBid = {
-      id: Date.now(),
-      user: "Anda",
-      avatar: "https://i.pravatar.cc/32?img=45",
-      amount,
-      time: new Date().toLocaleTimeString("id-ID", {
-        hour: "2-digit",
-        minute: "2-digit",
-        second: "2-digit",
-      }),
-      status: "active",
-    };
-    auction.value.bids.unshift(newBid);
-    activityFeed.value.unshift({
-      id: Date.now(),
-      icon: "mdi:gavel",
-      text: `Anda menaikkan bid menjadi ${formatRupiah(amount)}`,
-      time: "baru saja",
-    });
-    userBidStatus.value = "leading";
-    bidAmount.value = minBid.value;
-    isBidding.value = false;
+  try {
+    await placeBidApi(auction.value.id, amount);
     addNotif(
       "Bid Berhasil — Anda Sedang Memimpin",
       "success",
       "mdi:check-circle",
     );
-  }, 1200);
+    await fetchAuction();
+  } catch (err) {
+    console.error("Gagal tawar lelang:", err);
+    const errMsg = err.response?.data?.message ?? "Gagal mengajukan penawaran.";
+    bidError.value = errMsg;
+    addNotif(errMsg, "warning", "mdi:alert-circle");
+  } finally {
+    isBidding.value = false;
+  }
+}
+
+// ─── Buy Now ─────────────────────────────────────────────────────
+const isBuyingNow = ref(false);
+async function handleBuyNow() {
+  if (isBuyingNow.value) return;
+  if (!confirm(`Apakah Anda yakin ingin membeli item ini seharga ${formatRupiah(auction.value.buyNowPrice)} secara langsung?`)) {
+    return;
+  }
+  isBuyingNow.value = true;
+  try {
+    await buyNowApi(auction.value.id);
+    addNotif(
+      "Pembelian Berhasil! Anda memenangkan lelang ini.",
+      "success",
+      "mdi:trophy"
+    );
+    await fetchAuction();
+  } catch (err) {
+    console.error("Gagal buy now:", err);
+    const errMsg = err.response?.data?.message ?? "Gagal melakukan Buy Now.";
+    addNotif(errMsg, "warning", "mdi:alert-circle");
+  } finally {
+    isBuyingNow.value = false;
+  }
 }
 
 // ─── Related auctions (TODO: fetch dari API) ─────────────────────
@@ -455,9 +533,10 @@ const relatedAuctions = ref([]);
                 </div>
               </div>
               <button
-                @click="watchlisted = !watchlisted"
+                @click="handleToggleWatchlist"
+                :disabled="isTogglingWatchlist"
                 :class="[
-                  'shrink-0 w-10 h-10 rounded-xl border-2 flex items-center justify-center transition-all duration-200',
+                  'shrink-0 w-10 h-10 rounded-xl border-2 flex items-center justify-center transition-all duration-200 disabled:opacity-50',
                   watchlisted
                     ? 'border-black bg-black text-white'
                     : 'border-gray-200 text-gray-400 hover:border-black hover:text-black',
@@ -931,12 +1010,16 @@ const relatedAuctions = ref([]);
               class="px-6 py-5 border-b border-gray-100"
             >
               <button
-                class="w-full py-3.5 bg-black text-white rounded-xl text-sm font-semibold hover:bg-gray-800 transition-colors"
+                @click="handleToggleWatchlist"
+                :disabled="isTogglingWatchlist"
+                class="w-full py-3.5 rounded-xl text-sm font-semibold transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
+                :class="watchlisted ? 'bg-gray-100 text-gray-800 hover:bg-gray-200' : 'bg-black text-white hover:bg-gray-800'"
               >
-                🔔 Ingatkan Saya
+                <Icon :icon="watchlisted ? 'mdi:bell-off' : 'mdi:bell'" class="w-4.5 h-4.5" />
+                {{ watchlisted ? "Batalkan Pengingat" : "Ingatkan Saya" }}
               </button>
               <p class="text-xs text-gray-400 text-center mt-2">
-                Anda akan diberitahu saat lelang dimulai
+                {{ watchlisted ? "Pengingat aktif. Anda akan mendapatkan notifikasi saat lelang dimulai." : "Anda akan diberitahu saat lelang dimulai." }}
               </p>
             </div>
           </div>
@@ -963,9 +1046,31 @@ const relatedAuctions = ref([]);
               pemenang.
             </p>
             <button
-              class="w-full py-3 border-2 border-black text-black rounded-xl text-sm font-semibold hover:bg-black hover:text-white transition-all duration-200"
+              @click="handleBuyNow"
+              :disabled="isBuyingNow"
+              class="w-full py-3 border-2 border-black text-black rounded-xl text-sm font-semibold hover:bg-black hover:text-white transition-all duration-200 disabled:opacity-50 flex items-center justify-center gap-2"
             >
-              Beli Sekarang
+              <svg
+                v-if="isBuyingNow"
+                class="w-4 h-4 animate-spin"
+                fill="none"
+                viewBox="0 0 24 24"
+              >
+                <circle
+                  class="opacity-25"
+                  cx="12"
+                  cy="12"
+                  r="10"
+                  stroke="currentColor"
+                  stroke-width="4"
+                />
+                <path
+                  class="opacity-75"
+                  fill="currentColor"
+                  d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"
+                />
+              </svg>
+              {{ isBuyingNow ? "Memproses..." : "Beli Sekarang" }}
             </button>
           </div>
 

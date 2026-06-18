@@ -10,6 +10,7 @@ use App\Http\Controllers\Api\BidController;
 use App\Http\Controllers\Api\BuyNowController;
 use App\Http\Controllers\Api\NotificationController;
 use App\Http\Controllers\Api\ProfileController;
+use App\Http\Controllers\Api\WatchlistController;
 use Illuminate\Support\Facades\Route;
 
 // Route::get('/hello', function () {
@@ -66,6 +67,12 @@ Route::middleware('auth:sanctum')->group(function () {
 
     Route::post('auctions/{auction}/images',         [AuctionImageController::class, 'store']);
     Route::delete('auctions/{auction}/images/{image}', [AuctionImageController::class, 'destroy']);
+
+    // ------------------------------------------------------------------
+    // Watchlist
+    // ------------------------------------------------------------------
+    Route::get('watchlist', [WatchlistController::class, 'index']);
+    Route::post('auctions/{auction}/watchlist', [WatchlistController::class, 'store']);
 
     // ------------------------------------------------------------------
     // Penawaran (bid)

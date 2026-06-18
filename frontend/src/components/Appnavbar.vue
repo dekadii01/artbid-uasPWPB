@@ -2,6 +2,8 @@
 import { ref, computed, onMounted, onUnmounted, h } from "vue";
 import { useRouter } from "vue-router";
 import { useAuthStore } from "../stores/auth";
+import { Icon } from "@iconify/vue";
+import { getNotifications, markAsRead, markAllAsRead } from "../api/notifications";
 
 const router = useRouter();
 const auth = useAuthStore();
@@ -10,6 +12,10 @@ const auth = useAuthStore();
 const profileOpen = ref(false);
 const mobileOpen = ref(false);
 const profileRef = ref(null);
+
+const notifOpen = ref(false);
+const notifRef = ref(null);
+const notifications = ref([]);
 
 // ── User data — diambil langsung dari auth store ───────────────────
 // auth.user di-set otomatis saat login/register/fetchUser berhasil.
@@ -79,6 +85,42 @@ function iconPath(d) {
   );
 }
 
+// ── Notifications ──────────────────────────────────────────────────
+const unreadCount = computed(() => notifications.value.filter((n) => !n.read_at).length);
+
+async function fetchNotifications() {
+  if (!auth.isLoggedIn) return;
+  try {
+    const { data } = await getNotifications();
+    notifications.value = data.data ?? [];
+  } catch (err) {
+    console.error("Gagal fetch notifikasi:", err);
+  }
+}
+
+async function handleMarkAsRead(notif) {
+  if (notif.read_at) return;
+  try {
+    await markAsRead(notif.id);
+    notif.read_at = new Date().toISOString();
+  } catch (err) {
+    console.error("Gagal tandai dibaca:", err);
+  }
+}
+
+async function handleMarkAllAsRead() {
+  try {
+    await markAllAsRead();
+    notifications.value.forEach((n) => {
+      n.read_at = new Date().toISOString();
+    });
+  } catch (err) {
+    console.error("Gagal tandai semua dibaca:", err);
+  }
+}
+
+let notifInterval;
+
 // ── Logout ────────────────────────────────────────────────────────
 async function handleLogout() {
   profileOpen.value = false;
@@ -95,9 +137,20 @@ function handleClickOutside(e) {
   if (profileRef.value && !profileRef.value.contains(e.target)) {
     profileOpen.value = false;
   }
+  if (notifRef.value && !notifRef.value.contains(e.target)) {
+    notifOpen.value = false;
+  }
 }
-onMounted(() => document.addEventListener("click", handleClickOutside));
-onUnmounted(() => document.removeEventListener("click", handleClickOutside));
+onMounted(() => {
+  document.addEventListener("click", handleClickOutside);
+  fetchNotifications();
+  // Poll setiap 30 detik
+  notifInterval = setInterval(fetchNotifications, 30000);
+});
+onUnmounted(() => {
+  document.removeEventListener("click", handleClickOutside);
+  clearInterval(notifInterval);
+});
 </script>
 
 <template>
@@ -126,27 +179,98 @@ onUnmounted(() => document.removeEventListener("click", handleClickOutside));
       <!-- Right actions -->
       <div class="flex items-center gap-3">
         <!-- Notifications -->
-        <button
-          class="relative w-9 h-9 rounded-lg border border-gray-200 flex items-center justify-center text-gray-500 hover:border-black hover:text-black transition-colors"
-        >
-          <svg
-            class="w-4 h-4"
-            fill="none"
-            stroke="currentColor"
-            viewBox="0 0 24 24"
+        <div class="relative" ref="notifRef">
+          <button
+            @click="notifOpen = !notifOpen"
+            class="relative w-9 h-9 rounded-lg border border-gray-200 flex items-center justify-center text-gray-500 hover:border-black hover:text-black transition-colors"
           >
-            <path
-              stroke-linecap="round"
-              stroke-linejoin="round"
-              stroke-width="2"
-              d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"
-            />
-          </svg>
-          <!-- Unread dot -->
-          <span
-            class="absolute top-1.5 right-1.5 w-2 h-2 bg-black rounded-full border-2 border-white"
-          ></span>
-        </button>
+            <svg
+              class="w-4 h-4"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
+              <path
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                stroke-width="2"
+                d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"
+              />
+            </svg>
+            <!-- Unread dot -->
+            <span
+              v-if="unreadCount > 0"
+              class="absolute top-1.5 right-1.5 w-2 h-2 bg-black rounded-full border-2 border-white animate-pulse"
+            ></span>
+          </button>
+
+          <!-- Dropdown Notifikasi -->
+          <transition
+            enter-active-class="transition duration-150 ease-out"
+            enter-from-class="opacity-0 translate-y-1"
+            enter-to-class="opacity-100 translate-y-0"
+            leave-active-class="transition duration-100 ease-in"
+            leave-from-class="opacity-100 translate-y-0"
+            leave-to-class="opacity-0 translate-y-1"
+          >
+            <div
+              v-if="notifOpen"
+              class="absolute right-0 top-full mt-2 w-80 bg-white rounded-xl border border-gray-100 shadow-lg overflow-hidden py-1.5 z-50 notif-dropdown"
+            >
+              <div class="px-4 py-2.5 border-b border-gray-100 flex items-center justify-between">
+                <p class="text-sm font-semibold text-gray-900">Notifikasi</p>
+                <button
+                  v-if="unreadCount > 0"
+                  @click="handleMarkAllAsRead"
+                  class="text-[10px] text-gray-400 hover:text-black transition-colors"
+                >
+                  Tandai semua dibaca
+                </button>
+              </div>
+
+              <!-- List notifikasi -->
+              <div class="max-h-64 overflow-y-auto custom-scroll">
+                <div v-if="notifications.length === 0" class="px-4 py-8 text-center text-xs text-gray-400">
+                  Tidak ada notifikasi.
+                </div>
+                <div
+                  v-else
+                  v-for="notif in notifications"
+                  :key="notif.id"
+                  @click="handleMarkAsRead(notif); notifOpen = false; $router.push(notif.data?.auction_id ? `/auction/${notif.data.auction_id}` : '/')"
+                  class="px-4 py-3 border-b border-gray-50 last:border-b-0 hover:bg-gray-50 cursor-pointer transition-colors flex items-start gap-2.5 text-left"
+                  :class="{ 'bg-gray-50/50 font-medium': !notif.read_at }"
+                >
+                  <!-- Icon -->
+                  <div
+                    class="w-7 h-7 rounded-lg shrink-0 flex items-center justify-center mt-0.5"
+                    :class="[
+                      notif.type === 'outbid' ? 'bg-red-50 text-red-600' :
+                      notif.type === 'auction_won' ? 'bg-amber-50 text-amber-600' :
+                      'bg-black text-white'
+                    ]"
+                  >
+                    <Icon
+                      :icon="
+                        notif.type === 'outbid' ? 'mdi:alert-circle' :
+                        notif.type === 'auction_won' ? 'mdi:trophy' :
+                        'mdi:bell'
+                      "
+                      class="w-4 h-4"
+                    />
+                  </div>
+                  <!-- Content -->
+                  <div class="flex-1 min-w-0">
+                    <p class="text-xs text-gray-900 leading-snug">{{ notif.title }}</p>
+                    <p class="text-[10px] text-gray-400 mt-0.5 line-clamp-2">{{ notif.body }}</p>
+                  </div>
+                  <!-- Unread indicator -->
+                  <span v-if="!notif.read_at" class="w-1.5 h-1.5 bg-black rounded-full shrink-0 mt-2"></span>
+                </div>
+              </div>
+            </div>
+          </transition>
+        </div>
 
         <!-- Divider -->
         <div class="w-px h-5 bg-gray-200"></div>
@@ -255,26 +379,94 @@ onUnmounted(() => document.removeEventListener("click", handleClickOutside));
 
       <div class="flex items-center gap-2">
         <!-- Notifications mobile -->
-        <button
-          class="relative w-9 h-9 rounded-lg border border-gray-200 flex items-center justify-center text-gray-500"
-        >
-          <svg
-            class="w-4 h-4"
-            fill="none"
-            stroke="currentColor"
-            viewBox="0 0 24 24"
+        <div class="relative">
+          <button
+            @click="notifOpen = !notifOpen"
+            class="relative w-9 h-9 rounded-lg border border-gray-200 flex items-center justify-center text-gray-500"
           >
-            <path
-              stroke-linecap="round"
-              stroke-linejoin="round"
-              stroke-width="2"
-              d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"
-            />
-          </svg>
-          <span
-            class="absolute top-1.5 right-1.5 w-2 h-2 bg-black rounded-full border-2 border-white"
-          ></span>
-        </button>
+            <svg
+              class="w-4 h-4"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
+              <path
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                stroke-width="2"
+                d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"
+              />
+            </svg>
+            <!-- Unread dot -->
+            <span
+              v-if="unreadCount > 0"
+              class="absolute top-1.5 right-1.5 w-2 h-2 bg-black rounded-full border-2 border-white animate-pulse"
+            ></span>
+          </button>
+
+          <!-- Dropdown Notifikasi Mobile -->
+          <transition
+            enter-active-class="transition duration-150 ease-out"
+            enter-from-class="opacity-0 translate-y-1"
+            enter-to-class="opacity-100 translate-y-0"
+            leave-active-class="transition duration-100 ease-in"
+            leave-from-class="opacity-100 translate-y-0"
+            leave-to-class="opacity-0 translate-y-1"
+          >
+            <div
+              v-if="notifOpen"
+              class="absolute right-0 top-full mt-2 w-72 bg-white rounded-xl border border-gray-100 shadow-lg overflow-hidden py-1.5 z-50 notif-dropdown"
+            >
+              <div class="px-4 py-2 flex items-center justify-between border-b border-gray-100">
+                <p class="text-xs font-semibold text-gray-950">Notifikasi</p>
+                <button
+                  v-if="unreadCount > 0"
+                  @click="handleMarkAllAsRead"
+                  class="text-[9px] text-gray-400 hover:text-black transition-colors"
+                >
+                  Semua dibaca
+                </button>
+              </div>
+
+              <!-- List notifikasi -->
+              <div class="max-h-60 overflow-y-auto custom-scroll">
+                <div v-if="notifications.length === 0" class="px-4 py-6 text-center text-xs text-gray-400">
+                  Tidak ada notifikasi.
+                </div>
+                <div
+                  v-else
+                  v-for="notif in notifications"
+                  :key="notif.id"
+                  @click="handleMarkAsRead(notif); notifOpen = false; mobileOpen = false; $router.push(notif.data?.auction_id ? `/auction/${notif.data.auction_id}` : '/')"
+                  class="px-4 py-2.5 border-b border-gray-50 last:border-b-0 hover:bg-gray-50 cursor-pointer transition-colors flex items-start gap-2 text-left"
+                  :class="{ 'bg-gray-50/50 font-medium': !notif.read_at }"
+                >
+                  <div
+                    class="w-6 h-6 rounded-lg shrink-0 flex items-center justify-center mt-0.5"
+                    :class="[
+                      notif.type === 'outbid' ? 'bg-red-50 text-red-600' :
+                      notif.type === 'auction_won' ? 'bg-amber-50 text-amber-600' :
+                      'bg-black text-white'
+                    ]"
+                  >
+                    <Icon
+                      :icon="
+                        notif.type === 'outbid' ? 'mdi:alert-circle' :
+                        notif.type === 'auction_won' ? 'mdi:trophy' :
+                        'mdi:bell'
+                      "
+                      class="w-3 h-3"
+                    />
+                  </div>
+                  <div class="flex-1 min-w-0">
+                    <p class="text-[11px] text-gray-900 leading-snug">{{ notif.title }}</p>
+                    <p class="text-[9px] text-gray-400 mt-0.5 line-clamp-2">{{ notif.body }}</p>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </transition>
+        </div>
 
         <!-- Hamburger -->
         <button

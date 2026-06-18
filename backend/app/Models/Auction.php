@@ -154,6 +154,22 @@ class Auction extends Model
         return $this->hasOne(AuctionWinner::class);
     }
 
+    /**
+     * Watchlist items for this auction.
+     */
+    public function watchlists(): HasMany
+    {
+        return $this->hasMany(Watchlist::class);
+    }
+
+    /**
+     * Users who have watchlisted this auction.
+     */
+    public function watchers(): \Illuminate\Database\Eloquent\Relations\BelongsToMany
+    {
+        return $this->belongsToMany(User::class, 'watchlists', 'auction_id', 'user_id')->withTimestamps();
+    }
+
     // -----------------------------------------------------------------------
     // Scopes
     // -----------------------------------------------------------------------
