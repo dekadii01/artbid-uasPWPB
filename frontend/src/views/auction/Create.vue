@@ -2,6 +2,8 @@
 import { Icon } from "@iconify/vue";
 import { ref, computed } from "vue";
 import { useRouter } from "vue-router";
+import { createAuction } from "../../api/auctions";
+import { buildAuctionFormData } from "../../api/buildAuctionFormData";
 
 const router = useRouter();
 
@@ -95,6 +97,9 @@ const isSuccess = ref(false);
 const mainPhotoPreview = ref(null);
 const extraPhotoPreviews = ref([]);
 const mainDragOver = ref(false);
+
+// Dipakai goToDetail() untuk redirect ke lelang yang baru dibuat
+const createdAuctionId = ref(null);
 
 // Accordion state — all open by default
 const openSections = ref([true, true, true]);
@@ -221,32 +226,79 @@ function validate() {
   return Object.keys(e).length === 0;
 }
 
+/**
+ * Map error validasi dari Laravel (response.data.errors, field snake_case)
+ * ke struktur errors.value lokal (field camelCase yang dipakai form ini).
+ */
+function applyServerErrors(serverErrors) {
+  const map = {
+    title: "name",
+    category: "category",
+    description: "description",
+    condition: "condition",
+    main_photo: "mainPhoto",
+    extra_photos: "extraPhotos",
+    starting_price: "startPrice",
+    bid_increment: "minIncrement",
+    buy_now_price: "buyNowPrice",
+    starts_at: "startDate",
+    ends_at: "endDate",
+  };
+
+  const mapped = {};
+  for (const [serverField, localField] of Object.entries(map)) {
+    if (serverErrors[serverField]) {
+      mapped[localField] = serverErrors[serverField][0];
+    }
+  }
+  errors.value = { ...errors.value, ...mapped };
+}
+
 // ─── Submit ───────────────────────────────────────────────────────
-function publishAuction() {
+async function publishAuction() {
   if (!validate()) {
-    // Scroll to first error
     setTimeout(() => {
       const el = document.querySelector(".field-error");
       el?.scrollIntoView({ behavior: "smooth", block: "center" });
     }, 50);
     return;
   }
+
   isSubmitting.value = true;
-  // TODO: kirim ke API: POST /api/auctions
-  setTimeout(() => {
-    isSubmitting.value = false;
+
+  try {
+    const formData = buildAuctionFormData(form.value);
+    const { data } = await createAuction(formData);
+
+    createdAuctionId.value = data.auction.id;
     isSuccess.value = true;
-  }, 1800);
+  } catch (err) {
+    if (err.response?.status === 422) {
+      applyServerErrors(err.response.data.errors);
+      setTimeout(() => {
+        const el = document.querySelector(".field-error");
+        el?.scrollIntoView({ behavior: "smooth", block: "center" });
+      }, 50);
+    } else {
+      alert(
+        err.response?.data?.message ||
+          "Gagal membuat lelang. Silakan coba lagi.",
+      );
+    }
+  } finally {
+    isSubmitting.value = false;
+  }
 }
 
 function saveDraft() {
-  // TODO: POST /api/auctions/draft
-  alert("Draft tersimpan. (TODO: hubungkan ke API)");
+  // TODO: belum ada endpoint draft di backend.
+  // Untuk sekarang, fitur draft belum tersedia.
+  alert("Fitur simpan draft belum tersedia.");
 }
 
 function goToDetail() {
   isSuccess.value = false;
-  router.push("/auctions/1");
+  router.push(`/auction/${createdAuctionId.value}`);
 }
 
 function resetForm() {
@@ -274,6 +326,7 @@ function resetForm() {
   mainPhotoPreview.value = null;
   extraPhotoPreviews.value = [];
   errors.value = {};
+  createdAuctionId.value = null;
 }
 </script>
 
@@ -1076,6 +1129,11 @@ function resetForm() {
                           {{ dur.label }}
                         </button>
                       </div>
+                      <p class="text-xs text-gray-400 mt-2 leading-relaxed">
+                        Catatan: durasi anti-sniping saat ini dikonfigurasi
+                        secara global oleh sistem (berlaku sama untuk semua
+                        lelang), pilihan di atas belum mempengaruhi lelang ini.
+                      </p>
                     </div>
                   </transition>
                 </div>
