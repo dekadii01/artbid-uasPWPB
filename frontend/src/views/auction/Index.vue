@@ -1,6 +1,10 @@
 <script setup>
-import { ref, computed, onMounted, onUnmounted } from "vue";
+import { ref, computed, onMounted, onUnmounted, watch } from "vue";
+import { useRouter } from "vue-router";
 import Navbar from "../../components/Appnavbar.vue";
+import { getAuctions } from "../../api/auctions";
+
+const router = useRouter();
 
 // ─── Helpers ─────────────────────────────────────────────────────
 function formatRupiah(value) {
@@ -27,6 +31,7 @@ onMounted(() => {
   ticker = setInterval(() => {
     now.value = new Date();
   }, 1000);
+  fetchAuctions();
 });
 onUnmounted(() => clearInterval(ticker));
 
@@ -36,7 +41,6 @@ const selectedCategory = ref("");
 const selectedStatus = ref("all");
 const sortBy = ref("latest");
 const currentPage = ref(1);
-const perPage = 9;
 
 const categories = [
   "Lukisan",
@@ -48,24 +52,118 @@ const categories = [
   "Koleksi Langka",
 ];
 
-const statusTabs = computed(() => [
-  { label: "Semua", value: "all", count: auctions.length },
-  {
-    label: "Sedang Berlangsung",
-    value: "live",
-    count: auctions.filter((a) => a.status === "live").length,
-  },
-  {
-    label: "Akan Datang",
-    value: "upcoming",
-    count: auctions.filter((a) => a.status === "upcoming").length,
-  },
-  {
-    label: "Selesai",
-    value: "ended",
-    count: auctions.filter((a) => a.status === "ended").length,
-  },
-]);
+// ─── API state ───────────────────────────────────────────────────
+const auctions = ref([]);
+const isLoading = ref(false);
+const isError = ref(false);
+const meta = ref({
+  current_page: 1,
+  last_page: 1,
+  total: 0,
+  per_page: 12,
+});
+
+// Status counts — dihitung dari total per-status lewat API terpisah
+// Untuk kesederhanaan, kita fetch semua lalu hitung di sini
+const statusCounts = ref({ all: 0, live: 0, upcoming: 0, ended: 0 });
+
+async function fetchAuctions() {
+  isLoading.value = true;
+  isError.value = false;
+
+  try {
+    const params = {
+      page: currentPage.value,
+      per_page: 12,
+    };
+
+    // Status filter — kirim ke backend
+    if (selectedStatus.value !== "all") {
+      params.status = selectedStatus.value;
+    }
+
+    // Category filter
+    if (selectedCategory.value) {
+      params.category = selectedCategory.value;
+    }
+
+    // Search
+    if (searchQuery.value.trim()) {
+      params.search = searchQuery.value.trim();
+    }
+
+    // Sort
+    if (sortBy.value !== "latest") {
+      params.sort = sortBy.value;
+    }
+
+    const { data } = await getAuctions(params);
+
+    auctions.value = data.data ?? [];
+    meta.value = {
+      current_page: data.current_page,
+      last_page: data.last_page,
+      total: data.total,
+      per_page: data.per_page,
+    };
+
+    // Hitung status counts saat filter = all (untuk badge di tab)
+    if (
+      selectedStatus.value === "all" &&
+      !selectedCategory.value &&
+      !searchQuery.value
+    ) {
+      statusCounts.value.all = data.total;
+      // Fetch counts per status di background
+      fetchStatusCounts();
+    }
+  } catch (err) {
+    console.error("Gagal fetch auctions:", err);
+    isError.value = true;
+  } finally {
+    isLoading.value = false;
+  }
+}
+
+async function fetchStatusCounts() {
+  try {
+    const [liveRes, upcomingRes, endedRes] = await Promise.all([
+      getAuctions({ status: "live", per_page: 1 }),
+      getAuctions({ status: "upcoming", per_page: 1 }),
+      getAuctions({ status: "ended", per_page: 1 }),
+    ]);
+    statusCounts.value.live = liveRes.data.total;
+    statusCounts.value.upcoming = upcomingRes.data.total;
+    statusCounts.value.ended = endedRes.data.total;
+    statusCounts.value.all =
+      statusCounts.value.live +
+      statusCounts.value.upcoming +
+      statusCounts.value.ended;
+  } catch {
+    // silent fail — counts tidak kritis
+  }
+}
+
+// Reset ke halaman 1 saat filter berubah, lalu fetch ulang
+watch([selectedStatus, selectedCategory, sortBy], () => {
+  currentPage.value = 1;
+  fetchAuctions();
+});
+
+// Debounce search agar tidak spam request
+let searchTimer;
+watch(searchQuery, () => {
+  clearTimeout(searchTimer);
+  searchTimer = setTimeout(() => {
+    currentPage.value = 1;
+    fetchAuctions();
+  }, 400);
+});
+
+watch(currentPage, () => {
+  fetchAuctions();
+  window.scrollTo({ top: 0, behavior: "smooth" });
+});
 
 function resetFilters() {
   searchQuery.value = "";
@@ -75,283 +173,44 @@ function resetFilters() {
   currentPage.value = 1;
 }
 
-// ─── Platform stats sidebar ───────────────────────────────────────
+// ─── Status tabs ─────────────────────────────────────────────────
+const statusTabs = computed(() => [
+  { label: "Semua", value: "all", count: statusCounts.value.all },
+  {
+    label: "Sedang Berlangsung",
+    value: "live",
+    count: statusCounts.value.live,
+  },
+  {
+    label: "Akan Datang",
+    value: "upcoming",
+    count: statusCounts.value.upcoming,
+  },
+  { label: "Selesai", value: "ended", count: statusCounts.value.ended },
+]);
+
+// ─── Platform stats sidebar (static — bisa diganti API nanti) ────
 const platformStats = [
-  { key: "active", label: "Lelang Aktif", value: "128" },
-  { key: "bids", label: "Total Penawaran Hari Ini", value: "1.245" },
-  { key: "online", label: "Pengguna Online", value: "86" },
-  { key: "sold", label: "Barang Terjual", value: "532" },
-].filter((s) => s.key !== "online");
-
-// ─── Dummy Data ───────────────────────────────────────────────────
-// endsAt / startsAt — relative to page load time so countdown is always meaningful in demo
-function hoursFromNow(h) {
-  return new Date(Date.now() + h * 3600000).toISOString();
-}
-function daysFromNow(d) {
-  return new Date(Date.now() + d * 86400000).toISOString();
-}
-
-const auctions = [
   {
-    id: 1,
-    status: "live",
-    name: "Karma Tanah Lot",
-    category: "Lukisan",
-    seller: "I Wayan Sukerta",
-    currentPrice: 48500000,
-    bidCount: 24,
-    viewers: 18,
-    photoCount: 4,
-    image: "img/art1.png",
-    endsAt: hoursFromNow(2.8),
+    key: "active",
+    label: "Lelang Aktif",
+    value: computed(() => statusCounts.value.live.toString()),
   },
+  { key: "bids", label: "Total Penawaran Hari Ini", value: ref("—") },
   {
-    id: 2,
-    status: "live",
-    name: "Penjaga Bali",
-    category: "Patung",
-    seller: "I Made Wijaya",
-    currentPrice: 12500000,
-    bidCount: 18,
-    viewers: 9,
-    photoCount: 2,
-    image: "img/art2.png",
-    endsAt: hoursFromNow(2),
-  },
-  {
-    id: 3,
-    status: "live",
-    name: "Dewi Kesuburan",
-    category: "Patung",
-    seller: "Ni Luh Eka Sari",
-    currentPrice: 28000000,
-    bidCount: 31,
-    viewers: 22,
-    photoCount: 3,
-    image: "img/art3.png",
-    endsAt: hoursFromNow(5.4),
-  },
-  {
-    id: 4,
-    status: "live",
-    name: "Tanah & Api",
-    category: "Barang Antik",
-    seller: "Ketut Suardana",
-    currentPrice: 8750000,
-    bidCount: 9,
-    viewers: 4,
-    photoCount: 1,
-    image: "img/art4.png",
-    endsAt: hoursFromNow(0.75),
-  },
-  {
-    id: 5,
-    status: "live",
-    name: "Alam Tak Terbatas",
-    category: "Lukisan",
-    seller: "Sang Ayu Putu Riani",
-    currentPrice: 19200000,
-    bidCount: 22,
-    viewers: 15,
-    photoCount: 2,
-    image: "img/art5.png",
-    endsAt: hoursFromNow(1.2),
-  },
-  {
-    id: 6,
-    status: "live",
-    name: "Harmoni Semesta",
-    category: "Lukisan",
-    seller: "I Made Wijaya",
-    currentPrice: 15000000,
-    bidCount: 14,
-    viewers: 7,
-    photoCount: 3,
-    image: "img/art6.png",
-    endsAt: hoursFromNow(3.5),
-  },
-  {
-    id: 7,
-    status: "upcoming",
-    name: "Sunrise Penida",
-    category: "Koleksi Langka",
-    seller: "Agung Rai Photography",
-    currentPrice: 5000000,
-    bidCount: 0,
-    viewers: 0,
-    photoCount: 5,
-    image: "img/art7.png",
-    startsAt: hoursFromNow(6),
-  },
-  {
-    id: 8,
-    status: "upcoming",
-    name: "Jejak Digital",
-    category: "Koleksi Langka",
-    seller: "Dewa Gede Artana",
-    currentPrice: 35000000,
-    bidCount: 0,
-    viewers: 0,
-    photoCount: 2,
-    image: "img/art8.png",
-    startsAt: daysFromNow(1),
-  },
-  {
-    id: 9,
-    status: "upcoming",
-    name: "Topeng Rangda Antik",
-    category: "Topeng Tradisional",
-    seller: "I Nyoman Kariasa",
-    currentPrice: 22000000,
-    bidCount: 0,
-    viewers: 0,
-    photoCount: 3,
-    image: "img/art9.png",
-    startsAt: daysFromNow(2),
-  },
-  {
-    id: 10,
-    status: "upcoming",
-    name: "Ukiran Barong Gianyar",
-    category: "Ukiran Kayu",
-    seller: "Wayan Raka Sandi",
-    currentPrice: 17500000,
-    bidCount: 0,
-    viewers: 0,
-    photoCount: 4,
-    image: "img/art10.png",
-    startsAt: daysFromNow(3),
-  },
-  {
-    id: 11,
-    status: "ended",
-    name: "Bali Sunrise 1985",
-    category: "Lukisan",
-    seller: "I Gusti Nyoman Lempad Jr.",
-    currentPrice: 87500000,
-    bidCount: 47,
-    viewers: 0,
-    photoCount: 2,
-    image: "img/art11.png",
-  },
-  {
-    id: 12,
-    status: "ended",
-    name: "Keris Pusaka Abad XVIII",
-    category: "Barang Antik",
-    seller: "Puri Agung Karangasem",
-    currentPrice: 125000000,
-    bidCount: 61,
-    viewers: 0,
-    photoCount: 6,
-    image: "img/art12.png",
-  },
-  {
-    id: 13,
-    status: "ended",
-    name: "Gelang Perak Celuk",
-    category: "Kerajinan Perak",
-    seller: "Perak Bali Craft",
-    currentPrice: 4200000,
-    bidCount: 11,
-    viewers: 0,
-    photoCount: 3,
-    image: "img/art13.png",
-  },
-  {
-    id: 14,
-    status: "ended",
-    name: "Lontar Kuno Koleksi",
-    category: "Koleksi Langka",
-    seller: "Gedong Kirtya Archive",
-    currentPrice: 56000000,
-    bidCount: 33,
-    viewers: 0,
-    photoCount: 4,
-    image: "img/art14.png",
+    key: "sold",
+    label: "Barang Terjual",
+    value: computed(() => statusCounts.value.ended.toString()),
   },
 ];
 
-// ─── Computed ─────────────────────────────────────────────────────
-const filteredAuctions = computed(() => {
-  let result = [...auctions];
-
-  // Status filter
-  if (selectedStatus.value !== "all") {
-    result = result.filter((a) => a.status === selectedStatus.value);
-  }
-
-  // Category filter
-  if (selectedCategory.value) {
-    result = result.filter((a) => a.category === selectedCategory.value);
-  }
-
-  // Search
-  if (searchQuery.value.trim()) {
-    const q = searchQuery.value.toLowerCase();
-    result = result.filter(
-      (a) =>
-        a.name.toLowerCase().includes(q) ||
-        a.category.toLowerCase().includes(q) ||
-        a.seller.toLowerCase().includes(q),
-    );
-  }
-
-  // Sort
-  switch (sortBy.value) {
-    case "price_high":
-      result.sort((a, b) => b.currentPrice - a.currentPrice);
-      break;
-    case "price_low":
-      result.sort((a, b) => a.currentPrice - b.currentPrice);
-      break;
-    case "most_bids":
-      result.sort((a, b) => b.bidCount - a.bidCount);
-      break;
-    case "ending_soon":
-      result.sort((a, b) => {
-        const aTime = a.endsAt
-          ? new Date(a.endsAt)
-          : new Date(a.startsAt || "9999");
-        const bTime = b.endsAt
-          ? new Date(b.endsAt)
-          : new Date(b.startsAt || "9999");
-        return aTime - bTime;
-      });
-      break;
-    default:
-      break; // latest = original order
-  }
-
-  return result;
-});
-
-const totalPages = computed(() =>
-  Math.max(1, Math.ceil(filteredAuctions.value.length / perPage)),
-);
-
-const paginatedAuctions = computed(() => {
-  const start = (currentPage.value - 1) * perPage;
-  return filteredAuctions.value.slice(start, start + perPage);
-});
-
-// Reset to page 1 whenever filters change
-import { watch } from "vue";
-import router from "../../router/index.js";
-import { useRoute, useRouter } from "vue-router";
-watch([searchQuery, selectedCategory, selectedStatus, sortBy], () => {
-  currentPage.value = 1;
-});
-
-const goToAuction = (id) => {
-  router.push(`/auction/${id}`);
-};
+const goToAuction = (id) => router.push(`/auction/${id}`);
 </script>
 
 <template>
   <div class="bg-white min-h-screen font-sans overflow-x-hidden mt-20">
     <Navbar />
+
     <!-- ─── HEADER ─────────────────────────────────────────────────── -->
     <div class="px-6 md:px-10 pt-10 pb-8">
       <span
@@ -369,9 +228,9 @@ const goToAuction = (id) => {
       </p>
     </div>
 
-    <!-- ─── LAYOUT WRAPPER (sidebar + main) ────────────────────────── -->
+    <!-- ─── LAYOUT WRAPPER ──────────────────────────────────────────── -->
     <div class="px-6 md:px-10 pb-20 flex gap-8 items-start">
-      <!-- ── SIDEBAR STATISTIK (desktop only) ─────────────────────── -->
+      <!-- ── SIDEBAR STATISTIK ─────────────────────────────────────── -->
       <aside class="hidden xl:flex flex-col gap-4 w-56 shrink-0 sticky top-24">
         <p
           class="text-xs font-semibold tracking-[0.2em] uppercase text-gray-400 mb-1"
@@ -383,7 +242,9 @@ const goToAuction = (id) => {
           :key="stat.label"
           class="rounded-xl border border-gray-100 px-5 py-4 bg-white hover:shadow-sm transition-shadow"
         >
-          <p class="text-2xl font-bold">{{ stat.value }}</p>
+          <p class="text-2xl font-bold">
+            {{ typeof stat.value === "object" ? stat.value.value : stat.value }}
+          </p>
           <p class="text-gray-400 text-xs mt-0.5">{{ stat.label }}</p>
         </div>
 
@@ -393,11 +254,9 @@ const goToAuction = (id) => {
             <span
               class="live-dot w-2 h-2 rounded-full bg-white inline-block"
             ></span>
-            <p class="text-white text-xl font-bold">
-              {{ platformStats.find((s) => s.key === "online")?.value }}
-            </p>
+            <p class="text-white text-xl font-bold">{{ statusCounts.live }}</p>
           </div>
-          <p class="text-white/50 text-xs">Pengguna Online</p>
+          <p class="text-white/50 text-xs">Lelang Berlangsung</p>
         </div>
       </aside>
 
@@ -405,7 +264,6 @@ const goToAuction = (id) => {
       <div class="flex-1 min-w-0">
         <!-- Search + Filter bar -->
         <div class="flex flex-col md:flex-row gap-3 mb-6">
-          <!-- Search -->
           <div class="relative flex-1">
             <svg
               class="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none"
@@ -428,7 +286,6 @@ const goToAuction = (id) => {
             />
           </div>
 
-          <!-- Category -->
           <select
             v-model="selectedCategory"
             class="px-4 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:border-black transition-colors bg-white text-gray-700 cursor-pointer"
@@ -439,7 +296,6 @@ const goToAuction = (id) => {
             </option>
           </select>
 
-          <!-- Sort -->
           <select
             v-model="sortBy"
             class="px-4 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:border-black transition-colors bg-white text-gray-700 cursor-pointer"
@@ -467,44 +323,116 @@ const goToAuction = (id) => {
           >
             {{ tab.label }}
             <span
-              v-if="tab.count !== undefined"
               :class="[
                 'ml-1.5 text-xs px-1.5 py-0.5 rounded-full',
                 selectedStatus === tab.value
                   ? 'bg-white/20 text-white'
                   : 'bg-gray-200 text-gray-500',
               ]"
-              >{{ tab.count }}</span
             >
+              {{ tab.count }}
+            </span>
           </button>
         </div>
 
         <!-- Result count -->
         <p class="text-sm text-gray-400 mb-5">
           Menampilkan
-          <span class="text-black font-semibold">{{
-            filteredAuctions.length
-          }}</span>
-          lelang
+          <span class="text-black font-semibold">{{ meta.total }}</span> lelang
         </p>
 
-        <!-- ── AUCTION GRID ──────────────────────────────────────── -->
+        <!-- ── LOADING STATE ─────────────────────────────────────── -->
         <div
-          v-if="filteredAuctions.length > 0"
+          v-if="isLoading"
           class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5"
         >
           <div
-            v-for="auction in paginatedAuctions"
+            v-for="i in 6"
+            :key="i"
+            class="rounded-2xl border border-gray-100 overflow-hidden animate-pulse"
+          >
+            <div class="aspect-4/3 bg-gray-100"></div>
+            <div class="p-5 space-y-3">
+              <div class="h-3 bg-gray-100 rounded w-1/3"></div>
+              <div class="h-4 bg-gray-100 rounded w-3/4"></div>
+              <div class="h-3 bg-gray-100 rounded w-1/2"></div>
+              <div class="h-10 bg-gray-100 rounded-xl mt-4"></div>
+              <div class="h-10 bg-gray-100 rounded-lg mt-2"></div>
+            </div>
+          </div>
+        </div>
+
+        <!-- ── ERROR STATE ───────────────────────────────────────── -->
+        <div
+          v-else-if="isError"
+          class="flex flex-col items-center justify-center py-24 text-center"
+        >
+          <div
+            class="w-16 h-16 bg-gray-100 rounded-2xl flex items-center justify-center mb-5"
+          >
+            <svg
+              class="w-8 h-8 text-gray-300"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
+              <path
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                stroke-width="1.5"
+                d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
+              />
+            </svg>
+          </div>
+          <h3 class="font-semibold text-base mb-2">Gagal memuat data</h3>
+          <p class="text-gray-400 text-sm max-w-xs leading-relaxed">
+            Terjadi kesalahan saat mengambil data lelang.
+          </p>
+          <button
+            @click="fetchAuctions"
+            class="mt-6 px-6 py-2.5 bg-black text-white rounded-lg text-sm font-medium hover:bg-gray-800 transition-colors"
+          >
+            Coba Lagi
+          </button>
+        </div>
+
+        <!-- ── AUCTION GRID ──────────────────────────────────────── -->
+        <div
+          v-else-if="auctions.length > 0"
+          class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5"
+        >
+          <div
+            v-for="auction in auctions"
             :key="auction.id"
             class="rounded-2xl overflow-hidden bg-white border border-gray-100 card-lift shadow-sm flex flex-col"
           >
             <!-- Image area -->
             <div class="relative aspect-4/3 overflow-hidden bg-gray-100">
               <img
+                v-if="auction.image"
                 :src="auction.image"
                 :alt="auction.name"
                 class="w-full h-full object-cover"
               />
+              <!-- Fallback jika tidak ada foto -->
+              <div
+                v-else
+                class="w-full h-full flex items-center justify-center"
+              >
+                <svg
+                  class="w-12 h-12 text-gray-200"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                    stroke-width="1.5"
+                    d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"
+                  />
+                </svg>
+              </div>
 
               <!-- Multi-photo badge -->
               <div
@@ -551,33 +479,6 @@ const goToAuction = (id) => {
                   SELESAI
                 </span>
               </div>
-
-              <!-- Viewers (presence channel) -->
-              <div
-                v-if="auction.status === 'live' && auction.viewers"
-                class="absolute bottom-3 left-3 bg-black/60 backdrop-blur-sm text-white text-xs px-2.5 py-1 rounded-lg flex items-center gap-1.5"
-              >
-                <svg
-                  class="w-3.5 h-3.5"
-                  fill="none"
-                  stroke="currentColor"
-                  viewBox="0 0 24 24"
-                >
-                  <path
-                    stroke-linecap="round"
-                    stroke-linejoin="round"
-                    stroke-width="2"
-                    d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"
-                  />
-                  <path
-                    stroke-linecap="round"
-                    stroke-linejoin="round"
-                    stroke-width="2"
-                    d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"
-                  />
-                </svg>
-                {{ auction.viewers }} sedang melihat
-              </div>
             </div>
 
             <!-- Card body -->
@@ -612,17 +513,10 @@ const goToAuction = (id) => {
 
               <!-- Countdown / status block -->
               <div
-                :class="[
-                  'rounded-xl px-4 py-3 mb-4 flex items-center gap-3',
-                  auction.status === 'live'
-                    ? 'bg-gray-50 border border-gray-100'
-                    : auction.status === 'upcoming'
-                      ? 'bg-gray-50 border border-gray-100'
-                      : 'bg-gray-50 border border-gray-100',
-                ]"
+                class="rounded-xl px-4 py-3 mb-4 flex items-center gap-3 bg-gray-50 border border-gray-100"
               >
                 <!-- Live countdown -->
-                <template v-if="auction.status === 'live'">
+                <template v-if="auction.status === 'live' && auction.endsAt">
                   <svg
                     class="w-4 h-4 text-gray-500 shrink-0"
                     fill="none"
@@ -640,8 +534,8 @@ const goToAuction = (id) => {
                     <p class="text-xs text-gray-400 mb-1">Berakhir dalam</p>
                     <div class="flex gap-3">
                       <div
-                        class="text-center"
                         v-if="parseCountdown(auction.endsAt).days > 0"
+                        class="text-center"
                       >
                         <p class="font-bold text-sm leading-none">
                           {{
@@ -677,7 +571,9 @@ const goToAuction = (id) => {
                 </template>
 
                 <!-- Upcoming countdown -->
-                <template v-else-if="auction.status === 'upcoming'">
+                <template
+                  v-else-if="auction.status === 'upcoming' && auction.startsAt"
+                >
                   <svg
                     class="w-4 h-4 text-gray-500 shrink-0"
                     fill="none"
@@ -695,8 +591,8 @@ const goToAuction = (id) => {
                     <p class="text-xs text-gray-400 mb-1">Dimulai dalam</p>
                     <div class="flex gap-3">
                       <div
-                        class="text-center"
                         v-if="parseCountdown(auction.startsAt).days > 0"
+                        class="text-center"
                       >
                         <p class="font-bold text-sm leading-none">
                           {{
@@ -755,7 +651,7 @@ const goToAuction = (id) => {
                 </template>
               </div>
 
-              <!-- Action button — pushed to bottom -->
+              <!-- Action button -->
               <div class="mt-auto">
                 <button
                   v-if="auction.status === 'live'"
@@ -822,7 +718,7 @@ const goToAuction = (id) => {
 
         <!-- ── PAGINATION ──────────────────────────────────────── -->
         <div
-          v-if="totalPages > 1"
+          v-if="meta.last_page > 1"
           class="flex items-center justify-center gap-2 mt-10"
         >
           <button
@@ -846,7 +742,7 @@ const goToAuction = (id) => {
           </button>
 
           <button
-            v-for="p in totalPages"
+            v-for="p in meta.last_page"
             :key="p"
             @click="currentPage = p"
             :class="[
@@ -861,7 +757,7 @@ const goToAuction = (id) => {
 
           <button
             @click="currentPage++"
-            :disabled="currentPage === totalPages"
+            :disabled="currentPage === meta.last_page"
             class="w-9 h-9 rounded-lg border border-gray-200 flex items-center justify-center text-gray-500 hover:border-black hover:text-black transition-colors disabled:opacity-30 disabled:pointer-events-none"
           >
             <svg
@@ -893,8 +789,7 @@ const goToAuction = (id) => {
               >Untuk Seniman & Kolektor</span
             >
             <h2 class="text-2xl font-bold text-white mt-2 leading-tight">
-              Punya Koleksi Seni<br class="hidden sm:block" />
-              yang Ingin Dijual?
+              Punya Koleksi Seni<br class="hidden sm:block" />yang Ingin Dijual?
             </h2>
             <p class="text-white/50 text-sm mt-3 leading-relaxed max-w-sm">
               Buat lelang Anda sendiri dan temukan penawar terbaik secara
@@ -902,15 +797,14 @@ const goToAuction = (id) => {
             </p>
           </div>
           <button
+            @click="router.push('/auction/create')"
             class="relative shrink-0 px-8 py-3.5 bg-white text-black rounded-xl text-sm font-medium hover:bg-gray-100 transition-colors whitespace-nowrap"
           >
             Buat Lelang
           </button>
         </div>
       </div>
-      <!-- end main -->
     </div>
-    <!-- end layout wrapper -->
   </div>
 </template>
 
@@ -940,7 +834,6 @@ const goToAuction = (id) => {
   box-shadow: 0 20px 40px rgba(0, 0, 0, 0.1);
 }
 
-/* font-family harus sesuai dengan project Vue kamu (import DM Sans di main.css / index.html) */
 .font-sans {
   font-family: "DM Sans", sans-serif;
 }
