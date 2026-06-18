@@ -8,6 +8,7 @@ use App\Http\Controllers\Api\AuctionWinnerController;
 use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\BidController;
 use App\Http\Controllers\Api\BuyNowController;
+use App\Http\Controllers\Api\CategoryController;
 use App\Http\Controllers\Api\NotificationController;
 use App\Http\Controllers\Api\ProfileController;
 use Illuminate\Support\Facades\Route;
@@ -27,11 +28,14 @@ Route::prefix('auth')->group(function () {
     Route::post('login',    [AuthController::class, 'login']);
 });
 
-// Listing & detail lelang bisa dilihat tanpa login
+// Listing & detail lelang & kategori bisa dilihat tanpa login
 Route::get('auctions',              [AuctionController::class, 'index']);
 Route::get('auctions/{auction}',    [AuctionController::class, 'show']);
 Route::get('auctions/{auction}/bids',   [BidController::class, 'index']);
 Route::get('auctions/{auction}/winner', [AuctionWinnerController::class, 'show']);
+
+Route::get('categories',            [CategoryController::class, 'index']);
+Route::get('categories/{category}',  [CategoryController::class, 'show']);
 
 // ---------------------------------------------------------------------------
 // Protected routes — wajib login (Sanctum token)
@@ -100,5 +104,11 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::patch('auctions/{auction}/end',      [AdminAuctionController::class, 'forceEnd']);
         Route::patch('auctions/{auction}/activate', [AdminAuctionController::class, 'activate']);
         Route::put('users/{user}',                  [AdminUserController::class, 'update']);
+
+        // CRUD Kategori (Admin)
+        Route::post('categories',                   [CategoryController::class, 'store']);
+        Route::put('categories/{category}',         [CategoryController::class, 'update']);
+        Route::post('categories/{category}',        [CategoryController::class, 'update']); // untuk multipart/form-data
+        Route::delete('categories/{category}',      [CategoryController::class, 'destroy']);
     });
 });
