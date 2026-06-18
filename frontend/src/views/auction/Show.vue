@@ -34,6 +34,19 @@ let ticker;
 onMounted(() => {
   ticker = setInterval(() => {
     now.value = new Date();
+    
+    // Set status to 'live' and refresh data once upcoming starts
+    if (
+      auction.value &&
+      auction.value.status === "upcoming" &&
+      auction.value.startsAt
+    ) {
+      const startTime = new Date(auction.value.startsAt);
+      if (now.value >= startTime) {
+        auction.value.status = "live";
+        fetchAuction(true); // silent fetch to avoid glitch/flicker
+      }
+    }
   }, 1000);
 });
 onUnmounted(() => clearInterval(ticker));
@@ -43,12 +56,21 @@ const auction = ref(null);
 const isLoading = ref(true);
 const isError = ref(false);
 
-async function fetchAuction() {
-  isLoading.value = true;
+async function fetchAuction(isSilent = false) {
+  if (!isSilent) {
+    isLoading.value = true;
+  }
   isError.value = false;
   try {
     const { data } = await getAuction(route.params.id);
     auction.value = data.auction;
+
+    // If start time has passed, force status to live locally to prevent loop
+    if (auction.value.status === "upcoming" && auction.value.startsAt) {
+      if (new Date(auction.value.startsAt) <= new Date()) {
+        auction.value.status = "live";
+      }
+    }
 
     // Init bidAmount ke minimum bid
     const minB =
@@ -99,7 +121,9 @@ async function fetchAuction() {
     }
   } catch (err) {
     console.error("Gagal fetch auction:", err);
-    isError.value = true;
+    if (!isSilent) {
+      isError.value = true;
+    }
   } finally {
     isLoading.value = false;
   }
