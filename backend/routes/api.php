@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\Api\Admin\AuctionController as AdminAuctionController;
+use App\Http\Controllers\Api\Admin\UserController as AdminUserController;
 use App\Http\Controllers\Api\AuctionController;
 use App\Http\Controllers\Api\AuctionImageController;
 use App\Http\Controllers\Api\AuctionWinnerController;
@@ -98,5 +99,6 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::get('auctions',                      [AdminAuctionController::class, 'index']);
         Route::patch('auctions/{auction}/end',      [AdminAuctionController::class, 'forceEnd']);
         Route::patch('auctions/{auction}/activate', [AdminAuctionController::class, 'activate']);
+        Route::put('users/{user}',                  [AdminUserController::class, 'update']);
     });
 });
