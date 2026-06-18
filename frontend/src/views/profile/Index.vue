@@ -1,5 +1,7 @@
 <script setup>
-import { ref } from "vue";
+import { ref, onMounted } from "vue";
+import { useAuthStore } from "../../stores/auth";
+import * as authApi from "../../api/auth";
 
 // ─── Active section ───────────────────────────────────────────
 const activeTab = ref("profil");
@@ -34,10 +36,10 @@ const tabs = [
 
 // ─── User data ────────────────────────────────────────────────
 const user = ref({
-  fullName: "I Putu Arya Pratama",
-  username: "putuarya",
-  email: "putuarya@gmail.com",
-  phone: "0812xxxxxxxx",
+  fullName: "",
+  username: "",
+  email: "",
+  phone: "",
   address: "Jl. Raya Denpasar No. 45",
   city: "Denpasar",
   province: "Bali",
@@ -45,6 +47,39 @@ const user = ref({
   joinedAt: "10 Januari 2026",
   status: "active",
   location: "Denpasar, Bali",
+});
+
+const auth = useAuthStore();
+const selectedFile = ref(null);
+const errors = ref({});
+const saving = ref(false);
+const photoPreview = ref(null);
+
+onMounted(async () => {
+  try {
+    await auth.fetchUser();
+  } catch (err) {
+    console.error("Gagal memuat data user:", err);
+  }
+  
+  if (auth.user) {
+    user.value.fullName = auth.user.full_name || "";
+    user.value.username = auth.user.email ? auth.user.email.split("@")[0] : "user";
+    user.value.email = auth.user.email || "";
+    user.value.phone = auth.user.phone || "";
+    
+    if (auth.user.avatar) {
+      photoPreview.value = auth.user.avatar.startsWith("http")
+        ? auth.user.avatar
+        : `http://localhost:8000/storage/${auth.user.avatar}`;
+    }
+    
+    if (auth.user.created_at) {
+      const date = new Date(auth.user.created_at);
+      const options = { day: "numeric", month: "long", year: "numeric" };
+      user.value.joinedAt = date.toLocaleDateString("id-ID", options);
+    }
+  }
 });
 
 // ─── Stats summary ────────────────────────────────────────────
@@ -168,11 +203,11 @@ const showPasswordModal = ref(false);
 const passwords = ref({ current: "", newPass: "", confirm: "" });
 
 // ─── Photo upload ─────────────────────────────────────────────
-const photoPreview = ref(null);
 
 function handlePhotoChange(e) {
   const file = e.target.files[0];
   if (!file) return;
+  selectedFile.value = file;
   const reader = new FileReader();
   reader.onload = (ev) => (photoPreview.value = ev.target.result);
   reader.readAsDataURL(file);
@@ -180,15 +215,82 @@ function handlePhotoChange(e) {
 
 // ─── Save toast ───────────────────────────────────────────────
 const saved = ref(false);
-function save() {
-  saved.value = true;
-  setTimeout(() => (saved.value = false), 2500);
+
+async function save() {
+  saving.value = true;
+  errors.value = {};
+  
+  try {
+    const formData = new FormData();
+    
+    // Pecah nama lengkap menjadi firstName & lastName
+    const names = user.value.fullName.trim().split(/\s+/);
+    const firstName = names[0] || "";
+    const lastName = names.slice(1).join(" ") || "-";
+    
+    formData.append("firstName", firstName);
+    formData.append("lastName", lastName);
+    formData.append("email", user.value.email);
+    formData.append("phone", user.value.phone);
+    
+    // Method spoofing agar Laravel membaca request ini sebagai PUT
+    formData.append("_method", "PUT");
+    
+    // Lampirkan avatar jika ada file baru yang dipilih
+    if (selectedFile.value) {
+      formData.append("avatar", selectedFile.value);
+    }
+    
+    // Lampirkan password baru jika diisi di modal keamanan
+    if (passwords.value.newPass) {
+      formData.append("password", passwords.value.newPass);
+      formData.append("password_confirmation", passwords.value.confirm);
+    }
+    
+    // Mengirim data ke API backend
+    const { data } = await authApi.updateProfile(formData);
+    
+    // Sinkronisasi data user baru ke store Pinia agar navbar/halaman lain ikut terupdate
+    auth.user = data.user;
+    
+    // Perbarui state lokal halaman dengan data terbaru dari database
+    user.value.fullName = data.user.full_name || "";
+    user.value.email = data.user.email || "";
+    user.value.phone = data.user.phone || "";
+    
+    if (data.user.avatar) {
+      photoPreview.value = data.user.avatar.startsWith("http")
+        ? data.user.avatar
+        : `http://localhost:8000/storage/${data.user.avatar}`;
+    }
+    
+    // Reset file yang dipilih & inputan password
+    selectedFile.value = null;
+    passwords.value = { current: "", newPass: "", confirm: "" };
+    
+    // Tampilkan notifikasi toast sukses
+    saved.value = true;
+    setTimeout(() => (saved.value = false), 2500);
+  } catch (err) {
+    console.error("Gagal mengupdate profil:", err);
+    if (err.response && err.response.data && err.response.data.errors) {
+      errors.value = err.response.data.errors;
+      const messages = Object.values(errors.value).flat().join("\n");
+      alert(messages);
+    } else {
+      alert(err.response?.data?.message || "Terjadi kesalahan saat menyimpan profil.");
+    }
+  } finally {
+    saving.value = false;
+  }
 }
 
 // ─── Avatar helpers ───────────────────────────────────────────
 function initials(name) {
+  if (!name) return "U";
   return name
     .split(" ")
+    .filter(Boolean)
     .map((w) => w[0])
     .slice(0, 2)
     .join("")

@@ -126,9 +126,15 @@
           class="flex items-center gap-2.5 pl-1 pr-3 py-1 rounded-xl hover:bg-gray-50 transition-colors"
         >
           <div
-            class="w-7 h-7 rounded-lg bg-black flex items-center justify-center text-white text-xs font-bold shrink-0"
+            class="w-7 h-7 rounded-lg bg-black flex items-center justify-center text-white text-xs font-bold shrink-0 overflow-hidden"
           >
-            {{ adminInitials }}
+            <img
+              v-if="auth.user && auth.user.avatar"
+              :src="auth.user.avatar.startsWith('http') ? auth.user.avatar : `http://localhost:8000/storage/${auth.user.avatar}`"
+              alt="avatar"
+              class="w-full h-full object-cover"
+            />
+            <span v-else>{{ adminInitials }}</span>
           </div>
           <div class="text-left hidden sm:block">
             <p class="text-xs font-semibold text-gray-800 leading-none">
@@ -157,6 +163,26 @@
             v-if="profileOpen"
             class="absolute right-0 top-full mt-2 w-48 bg-white rounded-xl border border-gray-100 shadow-lg overflow-hidden py-1.5 z-50"
           >
+            <router-link
+              to="/profile"
+              @click="profileOpen = false"
+              class="flex items-center gap-3 px-4 py-2 text-sm text-gray-600 hover:bg-gray-50 hover:text-black transition-colors"
+            >
+              <svg
+                class="w-4 h-4"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                  stroke-width="2"
+                  d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"
+                />
+              </svg>
+              Profil Saya
+            </router-link>
             <router-link
               to="/admin/settings"
               @click="profileOpen = false"
@@ -209,8 +235,11 @@
 import { ref, computed, onMounted, onUnmounted } from "vue";
 import { useRoute, useRouter } from "vue-router";
 
+import { useAuthStore } from "../../stores/auth";
+
 const router = useRouter();
 const route = useRoute();
+const auth = useAuthStore();
 
 const searchQuery = ref("");
 const notifOpen = ref(false);
@@ -218,10 +247,11 @@ const profileOpen = ref(false);
 const notifRef = ref(null);
 const profileRef = ref(null);
 
-const adminName = ref("Admin Bali");
+const adminName = computed(() => auth.user?.full_name ?? "Admin Bali");
 const adminInitials = computed(() =>
   adminName.value
     .split(" ")
+    .filter(Boolean)
     .map((w) => w[0])
     .slice(0, 2)
     .join("")
@@ -249,8 +279,10 @@ const systemNotifs = [
   },
 ];
 
-function handleLogout() {
-  router.push("/admin/login");
+async function handleLogout() {
+  profileOpen.value = false;
+  await auth.logout();
+  router.push("/login");
 }
 
 function handleClickOutside(e) {
