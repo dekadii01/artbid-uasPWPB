@@ -6,17 +6,24 @@ Broadcast::channel('App.Models.User.{id}', function ($user, $id) {
     return (int) $user->id === (int) $id;
 }, ['guards' => ['sanctum']]);
 
+/*
+ * Channel: auction.{auctionId}
+ *
+ * This callback handles BOTH private AND presence subscriptions.
+ * When echo.join('auction.5') is called, Echo subscribes to
+ * "presence-auction.5". Laravel strips the prefix and looks up
+ * "auction.{auctionId}" here.
+ *
+ * For presence channels the callback MUST return an array with
+ * user metadata — returning a boolean silently breaks here/joining/leaving.
+ */
 Broadcast::channel('auction.{auctionId}', function ($user, $auctionId) {
-    return $user !== null;
-}, ['guards' => ['sanctum']]);
-
-Broadcast::channel('presence-auction.{auctionId}', function ($user, $auctionId) {
-    if ($user !== null) {
+    if ($user) {
         return [
-            'id' => $user->id,
+            'id'   => $user->id,
             'name' => $user->full_name,
         ];
     }
-    return null;
-}, ['guards' => ['sanctum']]);
 
+    return false;
+}, ['guards' => ['sanctum']]);

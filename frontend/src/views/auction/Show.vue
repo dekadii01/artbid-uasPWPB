@@ -107,16 +107,17 @@ async function fetchAuction() {
 
 const authStore = useAuthStore();
 let echoChannel = null;
+let mountedAuctionId = null; // captured at mount time — survives route changes
 
 onMounted(() => {
   fetchAuction();
 
   try {
     const echo = getEcho();
-    const auctionId = route.params.id;
+    mountedAuctionId = route.params.id;
 
     // Join the presence channel to track active viewers and listen for bid updates
-    echoChannel = echo.join(`auction.${auctionId}`)
+    echoChannel = echo.join(`auction.${mountedAuctionId}`)
       .here((users) => {
         viewers.value = users.length;
       })
@@ -216,16 +217,21 @@ onMounted(() => {
   }
 });
 
-onUnmounted(() => {
-  if (echoChannel) {
+function leaveAuctionChannel() {
+  if (echoChannel && mountedAuctionId) {
     try {
       const echo = getEcho();
-      const auctionId = route.params.id;
-      echo.leave(`auction.${auctionId}`);
+      echo.leave(`auction.${mountedAuctionId}`);
+      echoChannel = null;
+      mountedAuctionId = null;
     } catch (err) {
       console.error("Error leaving Echo channel:", err);
     }
   }
+}
+
+onUnmounted(() => {
+  leaveAuctionChannel();
 });
 
 // ─── Computed dari data auction ───────────────────────────────────
