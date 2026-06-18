@@ -1,7 +1,16 @@
 <script setup>
-import { ref, computed } from "vue";
+import { computed, onMounted, ref } from "vue";
+import {
+  createCategory,
+  deleteCategory,
+  getCategories,
+  updateCategory,
+} from "../../../api/categories";
 
-// ─── System alerts ───────────────────────────────────────────
+// ─── State Loading ───────────────────────────────────────────
+const isLoading = ref(false);
+
+// ─── System alerts (Tetap untuk UI mockup) ─────────────────────
 const systemAlerts = [
   {
     text: "Terdapat kategori yang belum digunakan pada lelang mana pun.",
@@ -17,166 +26,81 @@ const systemAlerts = [
   },
 ];
 
-// ─── Stats ───────────────────────────────────────────────────
-const stats = [
-  {
-    label: "Total Kategori",
-    value: "12",
-    sub: "Jumlah seluruh kategori",
-    dark: false,
-    icon: "M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z",
-  },
-  {
-    label: "Kategori Aktif",
-    value: "12",
-    sub: "Digunakan pada platform",
-    dark: true,
-    icon: "M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z",
-  },
-  {
-    label: "Total Lelang",
-    value: "325",
-    sub: "Lelang terkategorisasi",
-    dark: false,
-    icon: "M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10",
-  },
-  {
-    label: "Terpopuler",
-    value: "Lukisan",
-    sub: "Kategori dengan lelang terbanyak",
-    dark: false,
-    icon: "M11.049 2.927c.3-.921 1.603-.921 1.902 0l1.519 4.674a1 1 0 00.95.69h4.915c.969 0 1.371 1.24.588 1.81l-3.976 2.888a1 1 0 00-.363 1.118l1.518 4.674c.3.922-.755 1.688-1.538 1.118l-3.976-2.888a1 1 0 00-1.176 0l-3.976 2.888c-.783.57-1.838-.197-1.538-1.118l1.518-4.674a1 1 0 00-.363-1.118l-3.976-2.888c-.784-.57-.38-1.81.588-1.81h4.914a1 1 0 00.951-.69l1.519-4.674z",
-  },
-];
-
 // ─── Categories data ─────────────────────────────────────────
-const categories = ref([
-  {
-    id: 1,
-    name: "Lukisan",
-    description: "Kategori untuk berbagai karya seni lukis.",
-    totalAuctions: 125,
-    totalBids: 2350,
-    totalSellers: 58,
-    createdAt: "10 Jan 2026",
-    updatedAt: "12 Jun 2026",
-    icon: "M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z",
-    recentItems: [
-      {
-        name: "Lukisan Bali Klasik",
-        seller: "Ketut Wirawan",
-        status: "active",
-        price: 12500000,
-      },
-      {
-        name: "Harmoni Semesta",
-        seller: "Made Ayu Sari",
-        status: "ended",
-        price: 9800000,
-      },
-      {
-        name: "Pemandangan Ubud",
-        seller: "Sang Ayu Riani",
-        status: "active",
-        price: 7500000,
-      },
-    ],
-  },
-  {
-    id: 2,
-    name: "Patung",
-    description: "Kategori untuk berbagai karya seni patung.",
-    totalAuctions: 87,
-    totalBids: 890,
-    totalSellers: 34,
-    createdAt: "10 Jan 2026",
-    updatedAt: "5 Jun 2026",
-    icon: "M9 3H5a2 2 0 00-2 2v4m6-6h10a2 2 0 012 2v4M9 3v18m0 0h10a2 2 0 002-2V9M9 21H5a2 2 0 01-2-2V9m0 0h18",
-    recentItems: [
-      {
-        name: "Patung Garuda Bali",
-        seller: "I Putu Arya",
-        status: "active",
-        price: 15000000,
-      },
-      {
-        name: "Patung Dewi Sri",
-        seller: "Komang Bayu",
-        status: "active",
-        price: 8200000,
-      },
-    ],
-  },
-  {
-    id: 3,
-    name: "Topeng Tradisional",
-    description:
-      "Kategori untuk koleksi topeng tradisional Bali dan Nusantara.",
-    totalAuctions: 45,
-    totalBids: 520,
-    totalSellers: 22,
-    createdAt: "10 Jan 2026",
-    updatedAt: "3 Jun 2026",
-    icon: "M14.828 14.828a4 4 0 01-5.656 0M9 10h.01M15 10h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z",
-    recentItems: [
-      {
-        name: "Topeng Barong Antik",
-        seller: "I Putu Arya",
-        status: "ended",
-        price: 18500000,
-      },
-    ],
-  },
-  {
-    id: 4,
-    name: "Barang Antik",
-    description: "Kategori untuk barang koleksi dan benda antik.",
-    totalAuctions: 68,
-    totalBids: 740,
-    totalSellers: 29,
-    createdAt: "10 Jan 2026",
-    updatedAt: "10 Jun 2026",
-    icon: "M12 8v13m0-13V6a2 2 0 112 2h-2zm0 0V5.5A2.5 2.5 0 109.5 8H12zm-7 4h14M5 12a2 2 0 110-4h14a2 2 0 110 4M5 12v7a2 2 0 002 2h10a2 2 0 002-2v-7",
-    recentItems: [
-      {
-        name: "Keris Pusaka Jawa",
-        seller: "Budi Santoso",
-        status: "active",
-        price: 22000000,
-      },
-      {
-        name: "Gerabah Majapahit",
-        seller: "Wayan Sudira",
-        status: "ended",
-        price: 11000000,
-      },
-    ],
-  },
-  {
-    id: 5,
-    name: "Ukiran Kayu",
-    description: "Kategori untuk berbagai ukiran dan relief kayu.",
-    totalAuctions: 0,
-    totalBids: 0,
-    totalSellers: 0,
-    createdAt: "14 Jun 2026",
-    updatedAt: "14 Jun 2026",
-    icon: "M5 3v4M3 5h4M6 17v4m-2-2h4m5-16l2.286 6.857L21 12l-5.714 2.143L13 21l-2.286-6.857L5 12l5.714-2.143L13 3z",
-    recentItems: [],
-  },
-  {
-    id: 6,
-    name: "Kain Tradisional",
-    description: "Kategori untuk batik, tenun, dan kain tradisional Nusantara.",
-    totalAuctions: 0,
-    totalBids: 0,
-    totalSellers: 0,
-    createdAt: "14 Jun 2026",
-    updatedAt: "14 Jun 2026",
-    icon: "M7 21a4 4 0 01-4-4V5a2 2 0 012-2h4a2 2 0 012 2v12a4 4 0 01-4 4zm0 0h12a2 2 0 002-2v-4a2 2 0 00-2-2h-2.343M11 7.343l1.657-1.657a2 2 0 012.828 0l2.829 2.829a2 2 0 010 2.828l-8.486 8.485M7 17h.01",
-    recentItems: [],
-  },
-]);
+const categories = ref([]);
+
+// Mengambil data kategori dari API backend
+async function fetchCategories() {
+  isLoading.value = true;
+  try {
+    const { data } = await getCategories();
+    categories.value = data;
+  } catch (err) {
+    console.error("Gagal mengambil data kategori:", err);
+    alert("Gagal mengambil data kategori lelang dari server.");
+  } finally {
+    isLoading.value = false;
+  }
+}
+
+// Jalankan pengambilan data saat komponen dimuat
+onMounted(() => {
+  fetchCategories();
+});
+
+// ─── Stats computed secara dinamis ───────────────────────────
+const stats = computed(() => {
+  const total = categories.value.length;
+  const activeCount = categories.value.filter(
+    (c) => c.totalAuctions > 0,
+  ).length;
+  const totalAuctions = categories.value.reduce(
+    (sum, c) => sum + (c.totalAuctions || 0),
+    0,
+  );
+
+  // Cari kategori paling populer (jumlah lelang terbanyak)
+  let popular = "—";
+  if (total > 0) {
+    const sorted = [...categories.value].sort(
+      (a, b) => b.totalAuctions - a.totalAuctions,
+    );
+    if (sorted[0] && sorted[0].totalAuctions > 0) {
+      popular = sorted[0].name;
+    }
+  }
+
+  return [
+    {
+      label: "Total Kategori",
+      value: String(total),
+      sub: "Jumlah seluruh kategori",
+      dark: false,
+      icon: "M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z",
+    },
+    {
+      label: "Kategori Aktif",
+      value: String(activeCount),
+      sub: "Digunakan pada platform",
+      dark: true,
+      icon: "M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z",
+    },
+    {
+      label: "Total Lelang",
+      value: String(totalAuctions),
+      sub: "Lelang terkategorisasi",
+      dark: false,
+      icon: "M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10",
+    },
+    {
+      label: "Terpopuler",
+      value: popular,
+      sub: "Kategori lelang terbanyak",
+      dark: false,
+      icon: "M11.049 2.927c.3-.921 1.603-.921 1.902 0l1.519 4.674a1 1 0 00.95.69h4.915c.969 0 1.371 1.24.588 1.81l-3.976 2.888a1 1 0 00-.363 1.118l1.518 4.674c.3.922-.755 1.688-1.538 1.118l-3.976-2.888a1 1 0 00-1.176 0l-3.976 2.888c-.783.57-1.838-.197-1.538-1.118l1.518-4.674a1 1 0 00-.363-1.118l-3.976-2.888c-.784-.57-.38-1.81.588-1.81h4.914a1 1 0 00.951-.69l1.519-4.674z",
+    },
+  ];
+});
 
 // ─── Filters ─────────────────────────────────────────────────
 const searchQuery = ref("");
@@ -248,47 +172,76 @@ function selectCategory(cat) {
 // ─── Modal: Add / Edit ───────────────────────────────────────
 const showFormModal = ref(false);
 const editTarget = ref(null);
-const formData = ref({ name: "", description: "" });
+const formData = ref({ name: "", description: "", icon: "" });
+const imageFile = ref(null);
+const imagePreviewUrl = ref(null);
 
 function openAddModal() {
   editTarget.value = null;
-  formData.value = { name: "", description: "" };
+  formData.value = { name: "", description: "", icon: "" };
+  imageFile.value = null;
+  imagePreviewUrl.value = null;
   showFormModal.value = true;
 }
 
 function openEditModal(cat) {
   editTarget.value = cat;
-  formData.value = { name: cat.name, description: cat.description };
+  formData.value = {
+    name: cat.name,
+    description: cat.description,
+    icon: cat.icon,
+  };
+  imageFile.value = null;
+  imagePreviewUrl.value = cat.image || null;
   showFormModal.value = true;
 }
 
-function handleFormSubmit() {
-  if (!formData.value.name.trim()) return;
-  if (editTarget.value) {
-    const target = categories.value.find((c) => c.id === editTarget.value.id);
-    if (target) {
-      target.name = formData.value.name;
-      target.description = formData.value.description;
-      target.updatedAt = "15 Jun 2026";
-      if (selectedCategory.value?.id === target.id)
-        selectedCategory.value = { ...target };
-    }
-  } else {
-    const newCat = {
-      id: Date.now(),
-      name: formData.value.name,
-      description: formData.value.description,
-      totalAuctions: 0,
-      totalBids: 0,
-      totalSellers: 0,
-      createdAt: "15 Jun 2026",
-      updatedAt: "15 Jun 2026",
-      icon: "M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z",
-      recentItems: [],
-    };
-    categories.value.push(newCat);
+function handleImageChange(e) {
+  const file = e.target.files[0];
+  if (file) {
+    imageFile.value = file;
+    imagePreviewUrl.value = URL.createObjectURL(file);
   }
-  showFormModal.value = false;
+}
+
+async function handleFormSubmit() {
+  if (!formData.value.name.trim()) return;
+
+  const fd = new FormData();
+  fd.append("name", formData.value.name);
+  if (formData.value.description) {
+    fd.append("description", formData.value.description);
+  }
+  if (formData.value.icon) {
+    fd.append("icon", formData.value.icon);
+  }
+  if (imageFile.value) {
+    fd.append("image", imageFile.value);
+  }
+
+  try {
+    if (editTarget.value) {
+      await updateCategory(editTarget.value.id, fd);
+    } else {
+      await createCategory(fd);
+    }
+    showFormModal.value = false;
+    await fetchCategories();
+
+    // Perbarui panel detail jika ada kategori terpilih yang baru diedit
+    if (
+      editTarget.value &&
+      selectedCategory.value?.id === editTarget.value.id
+    ) {
+      const updated = categories.value.find(
+        (c) => c.id === editTarget.value.id,
+      );
+      selectedCategory.value = updated ? { ...updated } : null;
+    }
+  } catch (err) {
+    console.error("Gagal menyimpan kategori:", err);
+    alert(err.response?.data?.message || "Gagal menyimpan data kategori.");
+  }
 }
 
 // ─── Modal: Delete ───────────────────────────────────────────
@@ -298,15 +251,21 @@ function confirmDelete(cat) {
   deleteTarget.value = cat;
 }
 
-function handleDelete() {
+async function handleDelete() {
   if (!deleteTarget.value) return;
-  const idx = categories.value.findIndex((c) => c.id === deleteTarget.value.id);
-  if (idx !== -1) categories.value.splice(idx, 1);
-  if (selectedCategory.value?.id === deleteTarget.value.id) {
-    selectedCategory.value = null;
-    selectedId.value = null;
+
+  try {
+    await deleteCategory(deleteTarget.value.id);
+    if (selectedCategory.value?.id === deleteTarget.value.id) {
+      selectedCategory.value = null;
+      selectedId.value = null;
+    }
+    deleteTarget.value = null;
+    await fetchCategories();
+  } catch (err) {
+    console.error("Gagal menghapus kategori:", err);
+    alert(err.response?.data?.message || "Gagal menghapus kategori.");
   }
-  deleteTarget.value = null;
 }
 
 // ─── Top categories (sidebar) ────────────────────────────────
@@ -349,7 +308,6 @@ function auctionStatusStyle(status) {
     : { class: "bg-black text-white", dot: "bg-white", label: "Selesai" };
 }
 </script>
-
 <template>
   <div class="flex-1 px-8 py-8 space-y-6 min-h-screen bg-gray-50 font-sans">
     <!-- ═══════════════════ HEADER ═══════════════════ -->
@@ -1192,27 +1150,15 @@ function auctionStatusStyle(status) {
             <!-- Ikon (opsional) -->
             <div>
               <label class="block text-xs font-semibold text-gray-700 mb-1.5">
-                Ikon Kategori
+                SVG Path Ikon Kategori
                 <span class="text-gray-400 font-normal ml-1">(Opsional)</span>
               </label>
-              <div
-                class="border border-dashed border-gray-200 rounded-xl px-4 py-5 text-center bg-gray-50 hover:border-gray-400 transition-colors cursor-pointer"
-              >
-                <svg
-                  class="w-6 h-6 text-gray-300 mx-auto mb-2"
-                  fill="none"
-                  stroke="currentColor"
-                  viewBox="0 0 24 24"
-                >
-                  <path
-                    stroke-linecap="round"
-                    stroke-linejoin="round"
-                    stroke-width="1.5"
-                    d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"
-                  />
-                </svg>
-                <p class="text-xs text-gray-400">Unggah file ikon</p>
-              </div>
+              <input
+                v-model="formData.icon"
+                type="text"
+                placeholder="Contoh: M4 16l4.586-4.586a2 2..."
+                class="w-full border border-gray-200 rounded-xl px-4 py-2.5 text-sm text-black placeholder-gray-400 outline-none focus:border-black transition-colors bg-gray-50"
+              />
             </div>
             <!-- Gambar (opsional) -->
             <div>
@@ -1221,22 +1167,53 @@ function auctionStatusStyle(status) {
                 <span class="text-gray-400 font-normal ml-1">(Opsional)</span>
               </label>
               <div
+                @click="$refs.imageInput.click()"
                 class="border border-dashed border-gray-200 rounded-xl px-4 py-5 text-center bg-gray-50 hover:border-gray-400 transition-colors cursor-pointer"
               >
-                <svg
-                  class="w-6 h-6 text-gray-300 mx-auto mb-2"
-                  fill="none"
-                  stroke="currentColor"
-                  viewBox="0 0 24 24"
-                >
-                  <path
-                    stroke-linecap="round"
-                    stroke-linejoin="round"
-                    stroke-width="1.5"
-                    d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"
-                  />
-                </svg>
-                <p class="text-xs text-gray-400">Unggah gambar thumbnail</p>
+                <input
+                  ref="imageInput"
+                  type="file"
+                  accept="image/*"
+                  class="hidden"
+                  @change="handleImageChange"
+                />
+                <div v-if="imagePreviewUrl" class="relative w-full h-32 rounded-xl overflow-hidden mb-2">
+                  <img :src="imagePreviewUrl" class="w-full h-full object-cover" />
+                  <div
+                    @click.stop="imagePreviewUrl = null; imageFile = null"
+                    class="absolute top-2 right-2 w-6 h-6 bg-black/60 text-white rounded-lg flex items-center justify-center hover:bg-black transition-colors"
+                  >
+                    <svg
+                      class="w-3.5 h-3.5"
+                      fill="none"
+                      stroke="currentColor"
+                      viewBox="0 0 24 24"
+                    >
+                      <path
+                        stroke-linecap="round"
+                        stroke-linejoin="round"
+                        stroke-width="2"
+                        d="M6 18L18 6M6 6l12 12"
+                      />
+                    </svg>
+                  </div>
+                </div>
+                <div v-else>
+                  <svg
+                    class="w-6 h-6 text-gray-300 mx-auto mb-2"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path
+                      stroke-linecap="round"
+                      stroke-linejoin="round"
+                      stroke-width="1.5"
+                      d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"
+                    />
+                  </svg>
+                  <p class="text-xs text-gray-400">Unggah gambar thumbnail</p>
+                </div>
               </div>
             </div>
           </div>

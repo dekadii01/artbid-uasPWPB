@@ -1,6 +1,7 @@
 <script setup>
 import { Icon } from "@iconify/vue";
-import { ref, computed } from "vue";
+import { ref, computed, onMounted } from "vue";
+import { getCategories } from "../../api/categories";
 import { useRouter } from "vue-router";
 
 const router = useRouter();
@@ -34,16 +35,30 @@ function formatDateTime(date, time) {
 }
 
 // ─── Static options ───────────────────────────────────────────────
-const categories = [
-  "Lukisan",
-  "Patung",
-  "Topeng Tradisional",
-  "Ukiran Kayu",
-  "Kerajinan Perak",
-  "Barang Antik",
-  "Koleksi Langka",
-  "Lainnya",
-];
+const categories = ref([]);
+
+async function fetchCategories() {
+  try {
+    const { data } = await getCategories();
+    categories.value = data.map((c) => c.name);
+  } catch (err) {
+    console.error("Gagal memuat kategori:", err);
+    categories.value = [
+      "Lukisan",
+      "Patung",
+      "Topeng Tradisional",
+      "Ukiran Kayu",
+      "Kerajinan Perak",
+      "Barang Antik",
+      "Koleksi Langka",
+      "Lainnya",
+    ];
+  }
+}
+
+onMounted(() => {
+  fetchCategories();
+});
 const conditions = ["Sangat Baik", "Baik", "Cukup Baik", "Perlu Restorasi"];
 const minIncrementOptions = [50000, 100000, 250000, 500000, 1000000];
 const snipeExtOptions = [
