@@ -11,6 +11,7 @@ use App\Http\Controllers\Api\BuyNowController;
 use App\Http\Controllers\Api\CategoryController;
 use App\Http\Controllers\Api\NotificationController;
 use App\Http\Controllers\Api\ProfileController;
+use App\Http\Controllers\Api\WatchlistController;
 use Illuminate\Support\Facades\Route;
 
 // Route::get('/hello', function () {
@@ -43,6 +44,9 @@ Route::get('categories/{category}',  [CategoryController::class, 'show']);
 
 Route::middleware('auth:sanctum')->group(function () {
 
+    // Broadcasting authentication
+    \Illuminate\Support\Facades\Broadcast::routes(['middleware' => ['auth:sanctum']]);
+
     // Auth
     Route::post('auth/logout', [AuthController::class, 'logout']);
 
@@ -70,6 +74,12 @@ Route::middleware('auth:sanctum')->group(function () {
 
     Route::post('auctions/{auction}/images',         [AuctionImageController::class, 'store']);
     Route::delete('auctions/{auction}/images/{image}', [AuctionImageController::class, 'destroy']);
+
+    // ------------------------------------------------------------------
+    // Watchlist
+    // ------------------------------------------------------------------
+    Route::get('watchlist', [WatchlistController::class, 'index']);
+    Route::post('auctions/{auction}/watchlist', [WatchlistController::class, 'store']);
 
     // ------------------------------------------------------------------
     // Penawaran (bid)

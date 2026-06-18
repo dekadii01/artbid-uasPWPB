@@ -30,6 +30,18 @@ let ticker;
 onMounted(() => {
   ticker = setInterval(() => {
     now.value = new Date();
+    
+    // Transisi status lelang dari upcoming -> live saat waktu mulai tercapai
+    if (auctions.value && auctions.value.length > 0) {
+      auctions.value.forEach((auc) => {
+        if (auc.status === "upcoming" && auc.startsAt) {
+          const startTime = new Date(auc.startsAt);
+          if (now.value >= startTime) {
+            auc.status = "live";
+          }
+        }
+      });
+    }
   }, 1000);
   fetchAuctions();
 });
@@ -99,7 +111,14 @@ async function fetchAuctions() {
 
     const { data } = await getAuctions(params);
 
-    auctions.value = data.data ?? [];
+    auctions.value = (data.data ?? []).map((auc) => {
+      if (auc.status === "upcoming" && auc.startsAt) {
+        if (new Date(auc.startsAt) <= new Date()) {
+          auc.status = "live";
+        }
+      }
+      return auc;
+    });
     meta.value = {
       current_page: data.current_page,
       last_page: data.last_page,

@@ -50,3 +50,31 @@ export const addAuctionImages = (auctionId, formData) => {
 export const deleteAuctionImage = (auctionId, imageId) => {
   return api.delete(`/auctions/${auctionId}/images/${imageId}`);
 };
+
+/**
+ * Ajukan penawaran (bid).
+ */
+export const placeBid = (auctionId, amount) => {
+  return api.post(`/auctions/${auctionId}/bids`, { amount });
+};
+
+/**
+ * Lakukan Buy Now untuk memenangkan lelang instan.
+ */
+export const buyNow = (auctionId) => {
+  return api.post(`/auctions/${auctionId}/buy-now`);
+};
+
+/**
+ * Toggle watchlist (tambah / hapus).
+ */
+export const toggleWatchlist = (auctionId) => {
+  return api.post(`/auctions/${auctionId}/watchlist`);
+};
+
+/**
+ * Ambil daftar watchlist user saat ini.
+ */
+export const getWatchlist = (params = {}) => {
+  return api.get("/watchlist", { params });
+};
