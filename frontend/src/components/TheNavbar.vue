@@ -26,9 +26,18 @@ const userEmail = computed(() => auth.user?.email ?? "");
 const userInitial = computed(() => userName.value.charAt(0).toUpperCase());
 const isAdmin = computed(() => auth.isAdmin);
 
-// ─── Dropdown menu items ──────────────────────────────────────
 const dropdownItems = computed(() => {
-  const items = [
+  if (isAdmin.value) {
+    return [
+      {
+        label: "Admin Dashboard",
+        to: "/admin/dashboard",
+        icon: "M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6",
+      },
+    ];
+  }
+
+  return [
     {
       label: "Lelang Saya",
       to: "/my-auctions",
@@ -45,18 +54,7 @@ const dropdownItems = computed(() => {
       icon: "M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z",
     },
   ];
-
-  if (isAdmin.value) {
-    items.unshift({
-      label: "Admin Dashboard",
-      to: "/admin/dashboard",
-      icon: "M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6",
-    });
-  }
-
-  return items;
 });
-
 // ─── Handlers ────────────────────────────────────────────────
 function handleScroll() {
   isScrolled.value = window.scrollY > 20;
