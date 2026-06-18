@@ -1,6 +1,11 @@
 <script setup>
 import { ref, computed, onMounted, onUnmounted } from "vue";
+import { useRoute, useRouter } from "vue-router";
 import { Icon } from "@iconify/vue";
+import { getAuction } from "../../api/auctions";
+
+const route = useRoute();
+const router = useRouter();
 
 // ─── Helpers ──────────────────────────────────────────────────────
 function formatRupiah(v) {
@@ -15,9 +20,6 @@ function formatRupiahShort(v) {
   if (v >= 1000) return v / 1000 + "rb";
   return v;
 }
-function hoursFromNow(h) {
-  return new Date(Date.now() + h * 3600000);
-}
 
 // ─── Reactive clock ───────────────────────────────────────────────
 const now = ref(new Date());
@@ -29,189 +31,62 @@ onMounted(() => {
 });
 onUnmounted(() => clearInterval(ticker));
 
-// ─── Dummy auction data (ganti dengan API) ────────────────────────
-const auction = ref({
-  id: 1,
-  name: "Lukisan Bali Klasik Tahun 1980",
-  category: "Lukisan",
-  status: "live", // 'live' | 'upcoming' | 'ended'
-  seller: "I Made Surya",
-  sellerAvatar: "https://i.pravatar.cc/80?img=33",
-  description:
-    "Lukisan karya seniman Bali terkemuka tahun 1980, dikerjakan dengan teknik cat minyak di atas kanvas berukuran 120×90 cm. Menampilkan pemandangan desa Bali klasik dengan nuansa alam yang autentik — sawah hijau berlapis, pepohonan kelapa, dan langit senja keemasan. Karya ini merupakan bagian dari koleksi pribadi yang disimpan selama lebih dari 40 tahun. Kondisi sangat baik, telah melewati proses restorasi profesional pada tahun 2019. Disertai sertifikat keaslian dari Yayasan Seni Bali.",
-  tags: ["Cat Minyak", "Kanvas", "1980an", "Realis", "Pemandangan"],
-  images: [
-    "https://images.unsplash.com/photo-1579783902614-a3fb3927b6a5?w=800&q=80",
-    "https://images.unsplash.com/photo-1541961017774-22349e4a1262?w=800&q=80",
-    "https://images.unsplash.com/photo-1501472312651-726afe119ff1?w=800&q=80",
-    "https://images.unsplash.com/photo-1565367777-8879b08cd5b6?w=800&q=80",
-  ],
-  startPrice: 5000000,
-  minIncrement: 250000,
-  buyNowPrice: 25000000,
-  endsAt: hoursFromNow(1.8),
-  winner: { name: "I Putu Arya", finalPrice: 12500000 },
+// ─── Fetch auction data ──────────────────────────────────────────
+const auction = ref(null);
+const isLoading = ref(true);
+const isError = ref(false);
+
+async function fetchAuction() {
+  isLoading.value = true;
+  isError.value = false;
+  try {
+    const { data } = await getAuction(route.params.id);
+    auction.value = data.auction;
+
+    // Init bidAmount ke minimum bid
+    const minB =
+      (data.auction.currentPrice ?? data.auction.startPrice) +
+      (data.auction.minIncrement ?? 0);
+    bidAmount.value = minB;
+  } catch (err) {
+    console.error("Gagal fetch auction:", err);
+    isError.value = true;
+  } finally {
+    isLoading.value = false;
+  }
+}
+
+onMounted(() => {
+  fetchAuction();
+
+  // Simulasi viewer fluctuation (nanti diganti presence channel Reverb)
+  setInterval(() => {
+    const delta = Math.random() > 0.5 ? 1 : -1;
+    viewers.value = Math.max(5, Math.min(40, viewers.value + delta));
+  }, 5000);
 });
 
-// ─── State ────────────────────────────────────────────────────────
-const activePhoto = ref(0);
-const watchlisted = ref(false);
-const descExpanded = ref(false);
-const bidAmount = ref(null);
-const bidError = ref("");
-const isBidding = ref(false);
-const viewers = ref(18);
-const userBidStatus = ref("leading"); // 'none' | 'leading' | 'outbid' | 'won'
+// ─── Computed dari data auction ───────────────────────────────────
+const images = computed(() => auction.value?.images?.map((i) => i.url) ?? []);
 
-// ─── Dummy bid history (newest first) ────────────────────────────
-const bidHistory = ref([
-  {
-    id: 7,
-    user: "Kol***udi",
-    avatar: "https://i.pravatar.cc/32?img=3",
-    amount: 8500000,
-    time: "10:15:32",
-  },
-  {
-    id: 6,
-    user: "Bud***ari",
-    avatar: "https://i.pravatar.cc/32?img=7",
-    amount: 8000000,
-    time: "10:12:10",
-  },
-  {
-    id: 5,
-    user: "Wiy***nto",
-    avatar: "https://i.pravatar.cc/32?img=12",
-    amount: 7750000,
-    time: "10:08:55",
-  },
-  {
-    id: 4,
-    user: "Sar***ewi",
-    avatar: "https://i.pravatar.cc/32?img=15",
-    amount: 7500000,
-    time: "10:05:22",
-  },
-  {
-    id: 3,
-    user: "Ptu***ya",
-    avatar: "https://i.pravatar.cc/32?img=20",
-    amount: 7000000,
-    time: "09:58:44",
-  },
-  {
-    id: 2,
-    user: "Agu***rai",
-    avatar: "https://i.pravatar.cc/32?img=25",
-    amount: 6500000,
-    time: "09:45:10",
-  },
-  {
-    id: 1,
-    user: "Ket***ana",
-    avatar: "https://i.pravatar.cc/32?img=30",
-    amount: 6000000,
-    time: "09:30:00",
-  },
-]);
+const currentPrice = computed(() => {
+  if (!auction.value) return 0;
+  // Kalau ada bid, ambil amount bid tertinggi; fallback ke current_price
+  const topBid = auction.value.bids?.[0]?.amount;
+  return topBid ?? auction.value.currentPrice;
+});
 
-const currentPrice = computed(
-  () => bidHistory.value[0]?.amount ?? auction.value.startPrice,
+const minBid = computed(
+  () => currentPrice.value + (auction.value?.minIncrement ?? 0),
 );
-const minBid = computed(() => currentPrice.value + auction.value.minIncrement);
-const quickBidIncrements = computed(() => [
-  auction.value.minIncrement,
-  auction.value.minIncrement * 2,
-  auction.value.minIncrement * 4,
-]);
 
-// ─── Activity feed ────────────────────────────────────────────────
-const activityFeed = ref([
-  {
-    id: 5,
-    icon: "mdi:gavel",
-    text: "Kol***udi menaikkan bid menjadi Rp 8.500.000",
-    time: "baru saja",
-  },
-  {
-    id: 4,
-    icon: "mdi:alert-circle",
-    text: "Bud***ari telah di-outbid",
-    time: "3 mnt lalu",
-  },
-  {
-    id: 3,
-    icon: "mdi:gavel",
-    text: "Bud***ari menaikkan bid menjadi Rp 8.000.000",
-    time: "3 mnt lalu",
-  },
-  {
-    id: 2,
-    icon: "mdi:eye",
-    text: "18 pengguna sedang menyaksikan lelang ini",
-    time: "5 mnt lalu",
-  },
-  {
-    id: 1,
-    icon: "mdi:gavel",
-    text: "Wiy***nto menaikkan bid menjadi Rp 7.750.000",
-    time: "6 mnt lalu",
-  },
-]);
+const quickBidIncrements = computed(() => {
+  const inc = auction.value?.minIncrement ?? 0;
+  return [inc, inc * 2, inc * 4];
+});
 
-// ─── Notifications ────────────────────────────────────────────────
-const notifications = ref([]);
-let notifId = 0;
-function addNotif(message, type = "success", icon = "🔔") {
-  const id = ++notifId;
-  notifications.value.unshift({ id, message, type, icon });
-  setTimeout(() => {
-    notifications.value = notifications.value.filter((n) => n.id !== id);
-  }, 4000);
-}
-
-// ─── Bid logic ────────────────────────────────────────────────────
-function placeBid() {
-  bidError.value = "";
-  const amount = Number(bidAmount.value);
-  if (!amount || amount < minBid.value) {
-    bidError.value = `Bid harus lebih besar dari ${formatRupiah(currentPrice.value)} + kenaikan minimum.`;
-    return;
-  }
-  isBidding.value = true;
-  setTimeout(() => {
-    const newBid = {
-      id: bidHistory.value.length + 1,
-      user: "Anda",
-      avatar: "https://i.pravatar.cc/32?img=45",
-      amount,
-      time: new Date().toLocaleTimeString("id-ID", {
-        hour: "2-digit",
-        minute: "2-digit",
-        second: "2-digit",
-      }),
-    };
-    bidHistory.value.unshift(newBid);
-    activityFeed.value.unshift({
-      id: Date.now(),
-      icon: "mdi:gavel",
-      text: `Anda menaikkan bid menjadi ${formatRupiah(amount)}`,
-      time: "baru saja",
-    });
-    userBidStatus.value = "leading";
-    bidAmount.value = null;
-    isBidding.value = false;
-    addNotif(
-      "Bid Berhasil — Anda Sedang Memimpin",
-      "success",
-      "mdi:alert-circle",
-    );
-  }, 1200);
-}
-
-// ─── Countdown ───────────────────────────────────────────────────
 const countdownUnits = computed(() => {
+  if (!auction.value) return [];
   const target =
     auction.value.status === "upcoming"
       ? auction.value.startsAt
@@ -237,107 +112,86 @@ const countdownUnits = computed(() => {
   ];
 });
 
-// ─── Anti-snipe banner ───────────────────────────────────────────
 const showAntiSnipeBanner = computed(() => {
-  if (auction.value.status !== "live") return false;
+  if (!auction.value || auction.value.status !== "live") return false;
   const diff = new Date(auction.value.endsAt) - now.value;
   return diff > 0 && diff <= 120000;
 });
-const antiSnipeExtended = ref(false);
 
-// ─── Simulate outbid after 8s (demo) ────────────────────────────
-let demoTimer;
-onMounted(() => {
-  demoTimer = setTimeout(() => {
-    if (userBidStatus.value === "leading") {
-      userBidStatus.value = "outbid";
-      bidHistory.value.unshift({
-        id: 99,
-        user: "Pnw***ari",
-        avatar: "https://i.pravatar.cc/32?img=50",
-        amount: currentPrice.value + auction.value.minIncrement,
-        time: new Date().toLocaleTimeString("id-ID", {
-          hour: "2-digit",
-          minute: "2-digit",
-          second: "2-digit",
-        }),
-      });
-      activityFeed.value.unshift(
-        {
-          id: Date.now() + 1,
-          icon: "mdi:gavel",
-          text: `Pnw***ari menaikkan bid menjadi ${formatRupiah(bidHistory.value[0].amount)}`,
-          time: "baru saja",
-        },
-        {
-          id: Date.now() + 2,
-          icon: "mdi:alert-circle",
-          text: "Anda telah di-outbid",
-          time: "baru saja",
-        },
-      );
-      addNotif("Anda Telah Di-Outbid", "error", "mdi:alert-circle");
-    }
-  }, 8000);
-});
-onUnmounted(() => clearTimeout(demoTimer));
+// ─── UI state ─────────────────────────────────────────────────────
+const activePhoto = ref(0);
+const watchlisted = ref(false);
+const descExpanded = ref(false);
+const bidAmount = ref(null);
+const bidError = ref("");
+const isBidding = ref(false);
+const viewers = ref(18);
+const userBidStatus = ref("none"); // 'none' | 'leading' | 'outbid' | 'won'
 
-// ─── Simulated viewer fluctuation ───────────────────────────────
-onMounted(() => {
-  setInterval(() => {
-    const delta = Math.random() > 0.5 ? 1 : -1;
-    viewers.value = Math.max(5, Math.min(40, viewers.value + delta));
-  }, 5000);
-});
+// ─── Activity feed (nanti dari Reverb) ───────────────────────────
+const activityFeed = ref([]);
 
-// ─── Related auctions dummy ──────────────────────────────────────
-const relatedAuctions = [
-  {
-    id: 2,
-    name: "Penjaga Bali",
-    category: "Patung",
-    status: "live",
-    image:
-      "https://images.unsplash.com/photo-1578301978069-3c23ee44e8dc?w=400&q=80",
-    currentPrice: 12500000,
-    bidCount: 18,
-  },
-  {
-    id: 3,
-    name: "Dewi Kesuburan",
-    category: "Patung",
-    status: "live",
-    image:
-      "https://images.unsplash.com/photo-1569091791842-7cfb64e04797?w=400&q=80",
-    currentPrice: 28000000,
-    bidCount: 31,
-  },
-  {
-    id: 7,
-    name: "Sunrise Penida",
-    category: "Koleksi Langka",
-    status: "upcoming",
-    image:
-      "https://images.unsplash.com/photo-1518544866330-4e716499f800?w=400&q=80",
-    currentPrice: 5000000,
-    bidCount: 0,
-  },
-  {
-    id: 5,
-    name: "Alam Tak Terbatas",
-    category: "Lukisan",
-    status: "live",
-    image:
-      "https://images.unsplash.com/photo-1579783902614-a3fb3927b6a5?w=400&q=80",
-    currentPrice: 19200000,
-    bidCount: 22,
-  },
-];
+// ─── Notifications ────────────────────────────────────────────────
+const notifications = ref([]);
+let notifId = 0;
+function addNotif(message, type = "success", icon = "mdi:bell") {
+  const id = ++notifId;
+  notifications.value.unshift({ id, message, type, icon });
+  setTimeout(() => {
+    notifications.value = notifications.value.filter((n) => n.id !== id);
+  }, 4000);
+}
+
+// ─── Bid logic (TODO: sambung ke POST /api/auctions/{id}/bids) ───
+function placeBid() {
+  bidError.value = "";
+  const amount = Number(bidAmount.value);
+  if (!amount || amount < minBid.value) {
+    bidError.value = `Bid minimal ${formatRupiah(minBid.value)}.`;
+    return;
+  }
+  isBidding.value = true;
+
+  // TODO: ganti dengan API call
+  // await placeBidApi(auction.value.id, { amount })
+  setTimeout(() => {
+    const newBid = {
+      id: Date.now(),
+      user: "Anda",
+      avatar: "https://i.pravatar.cc/32?img=45",
+      amount,
+      time: new Date().toLocaleTimeString("id-ID", {
+        hour: "2-digit",
+        minute: "2-digit",
+        second: "2-digit",
+      }),
+      status: "active",
+    };
+    auction.value.bids.unshift(newBid);
+    activityFeed.value.unshift({
+      id: Date.now(),
+      icon: "mdi:gavel",
+      text: `Anda menaikkan bid menjadi ${formatRupiah(amount)}`,
+      time: "baru saja",
+    });
+    userBidStatus.value = "leading";
+    bidAmount.value = minBid.value;
+    isBidding.value = false;
+    addNotif(
+      "Bid Berhasil — Anda Sedang Memimpin",
+      "success",
+      "mdi:check-circle",
+    );
+  }, 1200);
+}
+
+// ─── Related auctions (TODO: fetch dari API) ─────────────────────
+const relatedAuctions = ref([]);
 </script>
 
 <template>
   <div class="bg-white min-h-screen font-sans">
-    <!-- ── FLOATING NOTIFICATIONS ─────────────────────────────────── -->
+    <!-- ── FLOATING NOTIFICATIONS ────────────────────────────────── -->
     <div
       class="fixed top-24 right-5 z-50 flex flex-col gap-2 pointer-events-none"
     >
@@ -353,7 +207,7 @@ const relatedAuctions = [
           v-for="notif in notifications"
           :key="notif.id"
           :class="[
-            'pointer-events-auto flex items-center gap-3 px-4 py-3 rounded-xl shadow-lg border text-sm font-medium min-w-65',
+            'pointer-events-auto flex items-center gap-3 px-4 py-3 rounded-xl shadow-lg border text-sm font-medium min-w-[260px]',
             notif.type === 'success'
               ? 'bg-white border-gray-200 text-gray-900'
               : notif.type === 'warning'
@@ -361,19 +215,13 @@ const relatedAuctions = [
                 : 'bg-black border-black text-white',
           ]"
         >
-          <div
-            class="flex gap-x-2 items-center"
-            v-for="notif in notifications"
-            :key="notif.id"
-          >
-            <Icon :icon="notif.icon" class="w-5 h-5" />
-            <span>{{ notif.message }}</span>
-          </div>
+          <Icon :icon="notif.icon" class="w-5 h-5 shrink-0" />
+          <span>{{ notif.message }}</span>
         </div>
       </transition-group>
     </div>
 
-    <!-- ── ANTI-SNIPE BANNER ──────────────────────────────────────── -->
+    <!-- ── ANTI-SNIPE BANNER ─────────────────────────────────────── -->
     <transition
       enter-active-class="transition duration-300 ease-out"
       enter-from-class="opacity-0 -translate-y-full"
@@ -384,18 +232,73 @@ const relatedAuctions = [
         class="bg-amber-50 border-b border-amber-200 px-6 py-3 flex items-center justify-center gap-3 text-sm"
       >
         <span class="text-amber-500">⚠</span>
-        <span class="text-amber-800 font-medium">
-          {{
-            antiSnipeExtended
-              ? "⏰ Waktu lelang diperpanjang 2 menit karena terdapat bid pada detik terakhir."
-              : "Lelang akan diperpanjang otomatis jika ada bid pada 30 detik terakhir."
-          }}
-        </span>
+        <span class="text-amber-800 font-medium"
+          >Lelang akan diperpanjang otomatis jika ada bid pada 30 detik
+          terakhir.</span
+        >
       </div>
     </transition>
 
-    <div class="px-6 md:px-10 py-8 mx-auto">
-      <!-- ── BREADCRUMB ─────────────────────────────────────────────── -->
+    <!-- ── LOADING STATE ─────────────────────────────────────────── -->
+    <div v-if="isLoading" class="px-6 md:px-10 py-8 mx-auto">
+      <div class="h-6 bg-gray-100 rounded w-64 mb-8 animate-pulse"></div>
+      <div class="grid grid-cols-1 lg:grid-cols-2 gap-10">
+        <div class="space-y-4">
+          <div class="aspect-[4/3] bg-gray-100 rounded-2xl animate-pulse"></div>
+          <div class="h-48 bg-gray-100 rounded-2xl animate-pulse"></div>
+        </div>
+        <div class="space-y-4">
+          <div class="h-64 bg-gray-100 rounded-2xl animate-pulse"></div>
+          <div class="h-32 bg-gray-100 rounded-2xl animate-pulse"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── ERROR STATE ───────────────────────────────────────────── -->
+    <div
+      v-else-if="isError"
+      class="flex flex-col items-center justify-center py-32 text-center px-6"
+    >
+      <div
+        class="w-16 h-16 bg-gray-100 rounded-2xl flex items-center justify-center mb-5"
+      >
+        <svg
+          class="w-8 h-8 text-gray-300"
+          fill="none"
+          stroke="currentColor"
+          viewBox="0 0 24 24"
+        >
+          <path
+            stroke-linecap="round"
+            stroke-linejoin="round"
+            stroke-width="1.5"
+            d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
+          />
+        </svg>
+      </div>
+      <h3 class="font-semibold text-base mb-2">Gagal memuat lelang</h3>
+      <p class="text-gray-400 text-sm mb-6">
+        Terjadi kesalahan atau lelang tidak ditemukan.
+      </p>
+      <div class="flex gap-3">
+        <button
+          @click="fetchAuction"
+          class="px-6 py-2.5 bg-black text-white rounded-lg text-sm font-medium hover:bg-gray-800 transition-colors"
+        >
+          Coba Lagi
+        </button>
+        <button
+          @click="router.push('/auctions')"
+          class="px-6 py-2.5 border border-gray-200 rounded-lg text-sm font-medium hover:border-black transition-colors"
+        >
+          Kembali
+        </button>
+      </div>
+    </div>
+
+    <!-- ── MAIN CONTENT ──────────────────────────────────────────── -->
+    <div v-else-if="auction" class="px-6 md:px-10 py-8 mx-auto">
+      <!-- Breadcrumb -->
       <nav class="flex items-center gap-2 text-sm text-gray-400 mb-8">
         <router-link to="/" class="hover:text-black transition-colors"
           >Beranda</router-link
@@ -434,21 +337,41 @@ const relatedAuctions = [
         }}</span>
       </nav>
 
-      <!-- ── MAIN GRID ──────────────────────────────────────────────── -->
+      <!-- Main Grid -->
       <div class="grid grid-cols-1 lg:grid-cols-2 gap-10 mb-16">
-        <!-- LEFT: Gallery + Info ────────────────────────────────────── -->
+        <!-- LEFT: Gallery + Info -->
         <div class="flex flex-col gap-6">
           <!-- Gallery -->
           <div
             class="rounded-2xl overflow-hidden bg-gray-50 border border-gray-100"
           >
-            <!-- Main photo -->
             <div class="relative aspect-[4/3] overflow-hidden">
+              <!-- Foto utama -->
               <img
-                :src="auction.images[activePhoto]"
+                v-if="images.length > 0"
+                :src="images[activePhoto]"
                 :alt="auction.name"
                 class="w-full h-full object-cover transition-opacity duration-300"
               />
+              <div
+                v-else
+                class="w-full h-full flex items-center justify-center bg-gray-100"
+              >
+                <svg
+                  class="w-16 h-16 text-gray-200"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                    stroke-width="1.5"
+                    d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"
+                  />
+                </svg>
+              </div>
+
               <!-- Status badge -->
               <div class="absolute top-4 left-4">
                 <span
@@ -473,18 +396,20 @@ const relatedAuctions = [
                   🔴 Selesai
                 </span>
               </div>
-              <!-- Photo count badge -->
+
+              <!-- Photo count -->
               <div
+                v-if="images.length > 1"
                 class="absolute top-4 right-4 bg-black/60 backdrop-blur-sm text-white text-xs px-2.5 py-1 rounded-lg"
               >
-                {{ activePhoto + 1 }} / {{ auction.images.length }}
+                {{ activePhoto + 1 }} / {{ images.length }}
               </div>
             </div>
 
             <!-- Thumbnails -->
-            <div class="flex gap-2 p-3">
+            <div v-if="images.length > 1" class="flex gap-2 p-3">
               <button
-                v-for="(img, idx) in auction.images"
+                v-for="(img, idx) in images"
                 :key="idx"
                 @click="activePhoto = idx"
                 :class="[
@@ -503,7 +428,7 @@ const relatedAuctions = [
             </div>
           </div>
 
-          <!-- Item Info card -->
+          <!-- Item Info -->
           <div class="rounded-2xl border border-gray-100 bg-white p-6">
             <div class="flex items-start justify-between gap-4 mb-4">
               <div>
@@ -511,8 +436,24 @@ const relatedAuctions = [
                 <h1 class="text-xl font-bold leading-snug">
                   {{ auction.name }}
                 </h1>
+                <div class="flex gap-2 mt-2 flex-wrap">
+                  <span
+                    v-if="auction.condition"
+                    class="text-xs border border-gray-200 text-gray-500 px-2.5 py-1 rounded-full"
+                    >{{ auction.condition }}</span
+                  >
+                  <span
+                    v-if="auction.artist"
+                    class="text-xs border border-gray-200 text-gray-500 px-2.5 py-1 rounded-full"
+                    >{{ auction.artist }}</span
+                  >
+                  <span
+                    v-if="auction.year"
+                    class="text-xs border border-gray-200 text-gray-500 px-2.5 py-1 rounded-full"
+                    >{{ auction.year }}</span
+                  >
+                </div>
               </div>
-              <!-- Watchlist -->
               <button
                 @click="watchlisted = !watchlisted"
                 :class="[
@@ -538,16 +479,18 @@ const relatedAuctions = [
               </button>
             </div>
 
+            <!-- Seller -->
             <div
               class="flex items-center gap-3 mb-5 pb-5 border-b border-gray-100"
             >
-              <img
-                :src="auction.sellerAvatar"
-                class="w-9 h-9 rounded-full object-cover"
-              />
+              <div
+                class="w-9 h-9 rounded-full bg-gray-900 flex items-center justify-center text-white text-sm font-bold shrink-0"
+              >
+                {{ auction.seller?.name?.charAt(0) ?? "?" }}
+              </div>
               <div>
                 <p class="text-xs text-gray-400">Dijual oleh</p>
-                <p class="text-sm font-medium">{{ auction.seller }}</p>
+                <p class="text-sm font-medium">{{ auction.seller?.name }}</p>
               </div>
               <span
                 class="ml-auto text-xs bg-gray-100 text-gray-500 px-2.5 py-1 rounded-full"
@@ -577,17 +520,6 @@ const relatedAuctions = [
                   : "Baca selengkapnya ↓"
               }}
             </button>
-
-            <!-- Meta tags -->
-            <div class="flex flex-wrap gap-2 mt-5">
-              <span
-                v-for="tag in auction.tags"
-                :key="tag"
-                class="text-xs border border-gray-200 text-gray-500 px-3 py-1 rounded-full"
-              >
-                {{ tag }}
-              </span>
-            </div>
           </div>
 
           <!-- Bid History -->
@@ -600,18 +532,31 @@ const relatedAuctions = [
               </p>
               <span
                 class="text-xs bg-gray-100 text-gray-500 px-2.5 py-1 rounded-full"
-                >{{ bidHistory.length }} penawaran</span
+                >{{ auction.bidCount }} penawaran</span
               >
             </div>
 
-            <div class="space-y-2 max-h-72 overflow-y-auto pr-1 custom-scroll">
+            <!-- Empty bids -->
+            <div
+              v-if="!auction.bids || auction.bids.length === 0"
+              class="py-8 text-center"
+            >
+              <p class="text-sm text-gray-400">
+                Belum ada penawaran. Jadilah yang pertama!
+              </p>
+            </div>
+
+            <div
+              v-else
+              class="space-y-2 max-h-72 overflow-y-auto pr-1 custom-scroll"
+            >
               <transition-group
                 enter-active-class="transition duration-300 ease-out"
                 enter-from-class="opacity-0 -translate-y-2"
                 enter-to-class="opacity-100 translate-y-0"
               >
                 <div
-                  v-for="(bid, idx) in bidHistory"
+                  v-for="(bid, idx) in auction.bids"
                   :key="bid.id"
                   :class="[
                     'flex items-center justify-between px-4 py-3 rounded-xl transition-all duration-200',
@@ -660,8 +605,11 @@ const relatedAuctions = [
             </div>
           </div>
 
-          <!-- Live Activity Feed -->
-          <div class="rounded-2xl border border-gray-100 bg-white p-6">
+          <!-- Activity Feed -->
+          <div
+            v-if="activityFeed.length > 0"
+            class="rounded-2xl border border-gray-100 bg-white p-6"
+          >
             <p
               class="text-xs font-semibold tracking-[0.15em] uppercase text-gray-400 mb-4"
             >
@@ -678,7 +626,7 @@ const relatedAuctions = [
                   :key="act.id"
                   class="flex items-start gap-2.5 text-sm text-gray-500"
                 >
-                  <span class="mt-0.5 shrink-0">{{ act.icon }}</span>
+                  <Icon :icon="act.icon" class="w-4 h-4 mt-0.5 shrink-0" />
                   <p class="leading-relaxed">
                     {{ act.text }}
                     <span class="text-gray-300 text-xs ml-1">{{
@@ -691,7 +639,7 @@ const relatedAuctions = [
           </div>
         </div>
 
-        <!-- RIGHT: Auction Panel ──────────────────────────────────── -->
+        <!-- RIGHT: Auction Panel -->
         <div class="flex flex-col gap-4 lg:sticky lg:top-24 lg:self-start">
           <!-- User status banner -->
           <transition
@@ -707,40 +655,28 @@ const relatedAuctions = [
                   ? 'bg-emerald-50 border border-emerald-200 text-emerald-800'
                   : userBidStatus === 'outbid'
                     ? 'bg-red-50 border border-red-200 text-red-800'
-                    : userBidStatus === 'won'
-                      ? 'bg-black text-white'
-                      : '',
+                    : 'bg-black text-white',
               ]"
             >
-              <div class="flex items-center gap-2">
-                <Icon
-                  :icon="
-                    userBidStatus === 'leading'
-                      ? 'mdi:check-circle'
-                      : userBidStatus === 'outbid'
-                        ? 'mdi:alert-circle'
-                        : 'mdi:trophy'
-                  "
-                  :class="
-                    userBidStatus === 'leading'
-                      ? 'text-green-500'
-                      : userBidStatus === 'outbid'
-                        ? 'text-red-500'
-                        : 'text-yellow-500'
-                  "
-                  class="w-5 h-5"
-                />
-
-                <span>
-                  {{
-                    userBidStatus === "leading"
-                      ? "Anda Saat Ini Memimpin Lelang"
-                      : userBidStatus === "outbid"
-                        ? "Penawaran Anda Telah Dikalahkan"
-                        : "Selamat! Anda Memenangkan Lelang"
-                  }}
-                </span>
-              </div>
+              <Icon
+                :icon="
+                  userBidStatus === 'leading'
+                    ? 'mdi:check-circle'
+                    : userBidStatus === 'outbid'
+                      ? 'mdi:alert-circle'
+                      : 'mdi:trophy'
+                "
+                class="w-5 h-5"
+              />
+              <span>
+                {{
+                  userBidStatus === "leading"
+                    ? "Anda Saat Ini Memimpin Lelang"
+                    : userBidStatus === "outbid"
+                      ? "Penawaran Anda Telah Dikalahkan"
+                      : "Selamat! Anda Memenangkan Lelang"
+                }}
+              </span>
             </div>
           </transition>
 
@@ -748,11 +684,18 @@ const relatedAuctions = [
           <div
             class="rounded-2xl border border-gray-100 bg-white overflow-hidden"
           >
-            <!-- Current price header -->
+            <!-- Price header -->
             <div class="bg-black px-6 pt-6 pb-5">
               <div class="flex items-center justify-between mb-1">
-                <p class="text-white/50 text-xs">Harga Tertinggi Saat Ini</p>
+                <p class="text-white/50 text-xs">
+                  {{
+                    auction.status === "upcoming"
+                      ? "Harga Awal"
+                      : "Harga Tertinggi Saat Ini"
+                  }}
+                </p>
                 <div
+                  v-if="auction.status === 'live'"
                   class="flex items-center gap-2 bg-white/10 rounded-full px-2.5 py-1"
                 >
                   <span
@@ -764,7 +707,6 @@ const relatedAuctions = [
               <p class="text-white font-bold text-4xl mb-3">
                 {{ formatRupiah(currentPrice) }}
               </p>
-
               <div class="flex gap-5">
                 <div>
                   <p class="text-white/40 text-[10px]">Harga Awal</p>
@@ -781,7 +723,7 @@ const relatedAuctions = [
                 <div>
                   <p class="text-white/40 text-[10px]">Penawaran</p>
                   <p class="text-white/70 text-sm font-medium">
-                    {{ bidHistory.length }}
+                    {{ auction.bidCount }}
                   </p>
                 </div>
               </div>
@@ -870,7 +812,7 @@ const relatedAuctions = [
               </div>
             </div>
 
-            <!-- Bid input area -->
+            <!-- Bid input (live only) -->
             <div
               v-if="auction.status === 'live'"
               class="px-6 py-5 border-b border-gray-100"
@@ -881,7 +823,7 @@ const relatedAuctions = [
                 Ajukan Penawaran
               </p>
 
-              <!-- Quick bid buttons -->
+              <!-- Quick bid -->
               <div class="flex gap-2 mb-3">
                 <button
                   v-for="inc in quickBidIncrements"
@@ -905,7 +847,7 @@ const relatedAuctions = [
                   :class="[
                     'w-full pl-10 pr-4 py-3 border rounded-xl text-sm font-semibold focus:outline-none transition-colors',
                     bidError
-                      ? 'border-red-300 bg-red-50 text-red-700 focus:border-red-400'
+                      ? 'border-red-300 bg-red-50 text-red-700'
                       : 'border-gray-200 focus:border-black',
                   ]"
                 />
@@ -961,7 +903,7 @@ const relatedAuctions = [
 
             <!-- Winner info (ended) -->
             <div
-              v-if="auction.status === 'ended'"
+              v-if="auction.status === 'ended' && auction.winner"
               class="px-6 py-5 border-b border-gray-100"
             >
               <div class="flex items-center gap-4">
@@ -983,7 +925,7 @@ const relatedAuctions = [
               </div>
             </div>
 
-            <!-- Upcoming - remind me -->
+            <!-- Upcoming — remind me -->
             <div
               v-if="auction.status === 'upcoming'"
               class="px-6 py-5 border-b border-gray-100"
@@ -1018,7 +960,7 @@ const relatedAuctions = [
             </div>
             <p class="text-xs text-gray-400 leading-relaxed mb-4">
               Mengakhiri lelang secara langsung dan menetapkan Anda sebagai
-              pemenang tanpa perlu menunggu.
+              pemenang.
             </p>
             <button
               class="w-full py-3 border-2 border-black text-black rounded-xl text-sm font-semibold hover:bg-black hover:text-white transition-all duration-200"
@@ -1027,7 +969,7 @@ const relatedAuctions = [
             </button>
           </div>
 
-          <!-- Share / report row -->
+          <!-- Share / report -->
           <div class="flex gap-2">
             <button
               class="flex-1 flex items-center justify-center gap-2 py-2.5 border border-gray-200 rounded-xl text-sm text-gray-500 hover:border-black hover:text-black transition-colors"
@@ -1067,12 +1009,10 @@ const relatedAuctions = [
             </button>
           </div>
         </div>
-        <!-- end right panel -->
       </div>
-      <!-- end main grid -->
 
-      <!-- ── RELATED AUCTIONS ─────────────────────────────────────── -->
-      <div class="mt-4">
+      <!-- Related auctions — TODO: fetch dari API -->
+      <div v-if="relatedAuctions.length > 0" class="mt-4">
         <div class="flex items-end justify-between mb-8">
           <div>
             <span
@@ -1103,12 +1043,12 @@ const relatedAuctions = [
             </svg>
           </router-link>
         </div>
-
         <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
           <div
             v-for="rel in relatedAuctions"
             :key="rel.id"
             class="rounded-2xl overflow-hidden bg-white border border-gray-100 card-lift shadow-sm cursor-pointer"
+            @click="router.push(`/auction/${rel.id}`)"
           >
             <div class="relative aspect-[4/3] overflow-hidden">
               <img
@@ -1116,16 +1056,6 @@ const relatedAuctions = [
                 :alt="rel.name"
                 class="w-full h-full object-cover"
               />
-              <div v-if="rel.status === 'live'" class="absolute top-3 left-3">
-                <span
-                  class="flex items-center gap-1.5 bg-black text-white text-xs px-2.5 py-1 rounded-full"
-                >
-                  <span
-                    class="live-dot w-1.5 h-1.5 rounded-full bg-white inline-block"
-                  ></span>
-                  Live
-                </span>
-              </div>
             </div>
             <div class="p-4">
               <p class="text-xs text-gray-400 mb-0.5">{{ rel.category }}</p>
@@ -1133,12 +1063,9 @@ const relatedAuctions = [
                 {{ rel.name }}
               </h3>
               <div class="flex items-center justify-between">
-                <div>
-                  <p class="text-[10px] text-gray-400">Harga saat ini</p>
-                  <p class="font-bold text-sm">
-                    {{ formatRupiah(rel.currentPrice) }}
-                  </p>
-                </div>
+                <p class="font-bold text-sm">
+                  {{ formatRupiah(rel.currentPrice) }}
+                </p>
                 <span class="text-xs text-gray-400"
                   >{{ rel.bidCount }} bid</span
                 >
@@ -1197,7 +1124,6 @@ const relatedAuctions = [
   -webkit-box-orient: vertical;
   overflow: hidden;
 }
-
 .font-sans {
   font-family: "DM Sans", sans-serif;
 }

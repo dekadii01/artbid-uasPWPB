@@ -100,11 +100,94 @@ class AuctionController extends Controller
     /**
      * Detail satu lelang (publik).
      */
+    /**
+     * Detail satu lelang (publik).
+     * GET /api/auctions/{id}
+     */
     public function show(Auction $auction): JsonResponse
     {
-        $auction->load(['seller', 'images', 'bids.bidder']);
+        $auction->load([
+            'seller:id,first_name,last_name,email,avatar,created_at',
+            'images',
+            'bids.bidder:id,first_name,last_name,avatar',
+            'winner.winner:id,first_name,last_name',
+        ])->loadCount('bids');
 
-        return response()->json(['auction' => $auction]);
+        $statusMap = [
+            'scheduled' => 'upcoming',
+            'active'    => 'live',
+            'ended'     => 'ended',
+        ];
+
+        // Sort images by sort_order
+        $images = $auction->images->sortBy('sort_order')->values();
+
+        // Format bids — masking nama untuk privasi
+        $bids = $auction->bids->map(function ($bid) {
+            $name = $bid->bidder?->full_name ?? 'Anonim';
+            // Masking: ambil 3 huruf pertama + *** + 3 huruf terakhir
+            $masked = strlen($name) > 6
+                ? substr($name, 0, 3) . '***' . substr($name, -3)
+                : substr($name, 0, 3) . '***';
+
+            return [
+                'id'     => $bid->id,
+                'user'   => $masked,
+                'avatar' => $bid->bidder?->avatar
+                    ? \Storage::disk(config('filesystems.default'))->url($bid->bidder->avatar)
+                    : 'https://i.pravatar.cc/32?u=' . $bid->bidder_id,
+                'amount' => (float) $bid->amount,
+                'time'   => $bid->placed_at
+                    ? \Carbon\Carbon::parse($bid->placed_at)->setTimezone('Asia/Makassar')->format('H:i:s')
+                    : $bid->created_at->setTimezone('Asia/Makassar')->format('H:i:s'),
+                'status' => $bid->status,
+            ];
+        })->sortByDesc('amount')->values();
+
+        // Winner info
+        $winner = null;
+        if ($auction->winner) {
+            $winner = [
+                'name'          => $auction->winner->winner?->full_name ?? '—',
+                'finalPrice'    => (float) $auction->winner->final_price,
+                'paymentStatus' => $auction->winner->payment_status ?? 'pending',
+            ];
+        }
+
+        return response()->json([
+            'auction' => [
+                'id'           => $auction->id,
+                'name'         => $auction->title,
+                'category'     => $auction->category,
+                'description'  => $auction->description,
+                'condition'    => $auction->condition ?? null,
+                'artist'       => $auction->artist ?? null,
+                'year'         => $auction->year ?? null,
+                'status'       => $statusMap[$auction->status] ?? $auction->status,
+                'startPrice'   => (float) $auction->starting_price,
+                'currentPrice' => (float) $auction->current_price,
+                'minIncrement' => (float) $auction->bid_increment,
+                'buyNowPrice'  => $auction->buy_now_price ? (float) $auction->buy_now_price : null,
+                'startsAt'     => $auction->starts_at?->toIso8601String(),
+                'endsAt'       => $auction->ends_at?->toIso8601String(),
+                'createdAt'    => $auction->created_at?->toIso8601String(),
+                'images'       => $images->map(fn($img) => [
+                    'id'        => $img->id,
+                    'url'       => $img->url,
+                    'sortOrder' => $img->sort_order,
+                ])->values(),
+                'seller' => [
+                    'id'        => $auction->seller?->id,
+                    'name'      => $auction->seller?->full_name,
+                    'email'     => $auction->seller?->email,
+                    'avatar'    => $auction->seller?->avatar ?? null,
+                    'joinedAt'  => $auction->seller?->created_at?->toIso8601String(),
+                ],
+                'bids'         => $bids,
+                'bidCount'     => $auction->bids_count,
+                'winner'       => $winner,
+            ],
+        ]);
     }
 
     /**
