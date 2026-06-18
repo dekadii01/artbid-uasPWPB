@@ -2,9 +2,8 @@
  * Ubah objek form (reactive) dari AuctionCreateView menjadi FormData
  * yang siap dikirim ke POST /api/auctions.
  *
- * Field 'antiSnipe' dan 'snipeExtension' SENGAJA tidak disertakan —
- * anti-sniping adalah konfigurasi global (config/auction.php di backend),
- * bukan per-lelang.
+ * Anti-sniping adalah konfigurasi global (config/auction.php di backend),
+ * bukan per-lelang — sehingga tidak ada field terkait di form ini.
  *
  * @param {object} form - form.value dari AuctionCreateView
  * @returns {FormData}

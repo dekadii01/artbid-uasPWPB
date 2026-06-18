@@ -63,11 +63,6 @@ onMounted(() => {
 });
 const conditions = ["Sangat Baik", "Baik", "Cukup Baik", "Perlu Restorasi"];
 const minIncrementOptions = [50000, 100000, 250000, 500000, 1000000];
-const snipeExtOptions = [
-  { label: "2 Menit", value: 2 },
-  { label: "5 Menit", value: 5 },
-  { label: "10 Menit", value: 10 },
-];
 const todayStr = new Date().toISOString().split("T")[0];
 
 const steps = [
@@ -97,8 +92,6 @@ const form = ref({
   startPrice: "",
   minIncrement: 100000,
   buyNowPrice: "",
-  antiSnipe: false,
-  snipeExtension: 2,
   startDate: "",
   startTime: "10:00",
   endDate: "",
@@ -330,8 +323,6 @@ function resetForm() {
     startPrice: "",
     minIncrement: 100000,
     buyNowPrice: "",
-    antiSnipe: false,
-    snipeExtension: 2,
     startDate: "",
     startTime: "10:00",
     endDate: "",
@@ -1090,67 +1081,35 @@ function resetForm() {
                 </p>
               </div>
 
-              <!-- Anti Sniping -->
+              <!-- Anti Sniping (Global Config — Read Only) -->
               <div>
                 <label class="field-label">Anti-Sniping</label>
                 <div class="border border-gray-200 rounded-xl p-4">
-                  <div class="flex items-center justify-between mb-3">
-                    <div>
-                      <p class="text-sm font-medium text-gray-800">
-                        Aktifkan Anti-Sniping
-                      </p>
-                      <p class="text-xs text-gray-400 mt-0.5">
-                        Perpanjang otomatis jika ada bid di 30 detik terakhir
-                      </p>
+                  <div class="flex items-start gap-3">
+                    <div class="w-9 h-9 bg-black rounded-xl flex items-center justify-center shrink-0 mt-0.5">
+                      <svg class="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
+                      </svg>
                     </div>
-                    <!-- Toggle -->
-                    <button
-                      @click="form.antiSnipe = !form.antiSnipe"
-                      :class="[
-                        'relative w-11 h-6 rounded-full transition-all duration-200 shrink-0',
-                        form.antiSnipe ? 'bg-black' : 'bg-gray-200',
-                      ]"
-                    >
-                      <span
-                        :class="[
-                          'absolute top-0.5 w-5 h-5 bg-white rounded-full shadow transition-all duration-200',
-                          form.antiSnipe ? 'left-[22px]' : 'left-0.5',
-                        ]"
-                      ></span>
-                    </button>
-                  </div>
-                  <!-- Durasi perpanjangan -->
-                  <transition
-                    enter-active-class="transition duration-200 ease-out"
-                    enter-from-class="opacity-0 -translate-y-1"
-                    enter-to-class="opacity-100 translate-y-0"
-                  >
-                    <div v-if="form.antiSnipe">
-                      <p class="text-xs text-gray-500 mb-2">
-                        Durasi Perpanjangan
-                      </p>
-                      <div class="flex gap-2">
-                        <button
-                          v-for="dur in snipeExtOptions"
-                          :key="dur.value"
-                          @click="form.snipeExtension = dur.value"
-                          :class="[
-                            'flex-1 py-1.5 text-xs rounded-lg border font-medium transition-all duration-200',
-                            form.snipeExtension === dur.value
-                              ? 'bg-black text-white border-black'
-                              : 'border-gray-200 text-gray-600 hover:border-black',
-                          ]"
-                        >
-                          {{ dur.label }}
-                        </button>
+                    <div class="flex-1 min-w-0">
+                      <div class="flex items-center gap-2 mb-1">
+                        <p class="text-sm font-semibold text-black">Proteksi Aktif</p>
+                        <span class="text-[10px] font-medium bg-emerald-100 text-emerald-700 px-2 py-0.5 rounded-full">Global</span>
                       </div>
-                      <p class="text-xs text-gray-400 mt-2 leading-relaxed">
-                        Catatan: durasi anti-sniping saat ini dikonfigurasi
-                        secara global oleh sistem (berlaku sama untuk semua
-                        lelang), pilihan di atas belum mempengaruhi lelang ini.
+                      <p class="text-xs text-gray-500 leading-relaxed">
+                        Semua lelang secara otomatis dilindungi oleh fitur anti-sniping.
+                        Jika ada tawaran masuk dalam <strong class="text-black">30 detik terakhir</strong>
+                        sebelum lelang berakhir, waktu lelang akan diperpanjang 30 detik
+                        untuk memberikan kesempatan fair bagi semua penawar.
                       </p>
+                      <div class="mt-3 flex items-center gap-2 bg-gray-50 rounded-lg px-3 py-2">
+                        <svg class="w-3.5 h-3.5 text-gray-400 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                        </svg>
+                        <p class="text-xs text-gray-500">Perpanjangan otomatis: <strong class="text-black">30 detik</strong></p>
+                      </div>
                     </div>
-                  </transition>
+                  </div>
                 </div>
               </div>
 

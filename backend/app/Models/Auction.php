@@ -95,7 +95,6 @@ class Auction extends Model
 
         if ($this->ends_at->lessThanOrEqualTo($threshold)) {
             $this->ends_at = now()->addSeconds($snipeSeconds);
-            $this->save();
             return true;
         }
 
