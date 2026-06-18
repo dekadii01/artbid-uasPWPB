@@ -70,7 +70,32 @@ class WatchlistController extends Controller
             ];
         });
 
-        return response()->json($auctions);
+        // Fetch latest 5 bids on any of the user's watched auctions
+        $watchedAuctionIds = $user->watchedAuctions()->pluck('auctions.id');
+        $activities = \App\Models\Bid::whereIn('auction_id', $watchedAuctionIds)
+            ->with(['auction:id,title', 'bidder:id,first_name,last_name'])
+            ->latest()
+            ->take(5)
+            ->get()
+            ->map(function ($bid) {
+                $timeStr = $bid->created_at->diffForHumans();
+                // Translate diffForHumans to Indonesian
+                $timeStr = str_replace(
+                    ['seconds', 'second', 'minutes', 'minute', 'hours', 'hour', 'days', 'day', 'weeks', 'week', 'months', 'month', 'years', 'year', 'ago', 'from now'],
+                    ['detik', 'detik', 'menit', 'menit', 'jam', 'jam', 'hari', 'hari', 'minggu', 'minggu', 'bulan', 'bulan', 'tahun', 'tahun', 'yang lalu', 'dari sekarang'],
+                    $timeStr
+                );
+                return [
+                    'type' => 'price',
+                    'text' => 'Penawaran baru pada <strong class="text-black">"' . e($bid->auction->title) . '"</strong> naik menjadi <strong class="text-black">Rp ' . number_format($bid->amount, 0, ',', '.') . '</strong>',
+                    'time' => $timeStr,
+                ];
+            });
+
+        $responseData = $auctions->toArray();
+        $responseData['activities'] = $activities;
+
+        return response()->json($responseData);
     }
 
     /**
