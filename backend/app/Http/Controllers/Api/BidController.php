@@ -123,10 +123,45 @@ class BidController extends Controller
                 return response()->json(['message' => $result['message']], $result['code']);
             }
 
+            $newBid = $result['bid'];
+            // Reload auction to get the latest updated fields (e.g. ends_at, current_price)
+            $updatedAuction = Auction::find($auction->id);
+
+            // Format bid data for broadcasting (matching transforms in AuctionController)
+            $name = $user->full_name ?? 'Anonim';
+            $masked = strlen($name) > 6
+                ? substr($name, 0, 3) . '***' . substr($name, -3)
+                : substr($name, 0, 3) . '***';
+
+            $bidDetails = [
+                'id'     => $newBid->id,
+                'user'   => $masked,
+                'avatar' => $user->avatar
+                    ? \Storage::disk(config('filesystems.default'))->url($user->avatar)
+                    : 'https://i.pravatar.cc/32?u=' . $newBid->bidder_id,
+                'amount' => (float) $newBid->amount,
+                'time'   => $newBid->placed_at
+                    ? \Carbon\Carbon::parse($newBid->placed_at)->setTimezone('Asia/Makassar')->format('H:i:s')
+                    : $newBid->created_at->setTimezone('Asia/Makassar')->format('H:i:s'),
+                'status' => $newBid->status,
+            ];
+
+            // Dispatch BidPlaced event
+            event(new \App\Events\BidPlaced(
+                $auction->id,
+                $amount,
+                $user->id,
+                $masked,
+                (float) $updatedAuction->current_price,
+                $updatedAuction->bids()->count(),
+                $updatedAuction->ends_at?->toIso8601String(),
+                $bidDetails
+            ));
+
             // Kirim notifikasi 'outbid' di luar transaksi agar tidak memblokir DB
             $previousActiveBid = $result['previousActiveBid'];
             if ($previousActiveBid && $previousActiveBid->bidder_id !== $user->id) {
-                Notification::create([
+                $notif = Notification::create([
                     'user_id' => $previousActiveBid->bidder_id,
                     'type'    => 'outbid',
                     'channel' => 'private',
@@ -138,6 +173,9 @@ class BidController extends Controller
                         'amount'        => (float) $amount,
                     ],
                 ]);
+
+                // Dispatch NotificationSent event for real-time notification
+                event(new \App\Events\NotificationSent($notif));
             }
 
             return response()->json([

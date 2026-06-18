@@ -85,7 +85,7 @@ class BuyNowController extends Controller
             }
 
             // Buat Notifikasi untuk pembeli (pemenang)
-            Notification::create([
+            $buyerNotif = Notification::create([
                 'user_id' => $user->id,
                 'type'    => 'auction_won',
                 'channel' => 'private',
@@ -97,9 +97,10 @@ class BuyNowController extends Controller
                     'price'         => (float) $auction->buy_now_price,
                 ],
             ]);
+            event(new \App\Events\NotificationSent($buyerNotif));
 
             // Buat Notifikasi untuk penjual (seller)
-            Notification::create([
+            $sellerNotif = Notification::create([
                 'user_id' => $auction->seller_id,
                 'type'    => 'auction_ended',
                 'channel' => 'private',
@@ -111,6 +112,16 @@ class BuyNowController extends Controller
                     'price'         => (float) $auction->buy_now_price,
                 ],
             ]);
+            event(new \App\Events\NotificationSent($sellerNotif));
+
+            // Dispatch AuctionEnded event
+            event(new \App\Events\AuctionEnded(
+                $auction->id,
+                'ended',
+                $user->id,
+                $user->full_name,
+                (float) $auction->buy_now_price
+            ));
 
             return response()->json([
                 'message' => 'Lelang berhasil dibeli langsung.',

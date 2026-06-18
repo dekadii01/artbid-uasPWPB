@@ -40,6 +40,9 @@ Route::get('auctions/{auction}/winner', [AuctionWinnerController::class, 'show']
 
 Route::middleware('auth:sanctum')->group(function () {
 
+    // Broadcasting authentication
+    \Illuminate\Support\Facades\Broadcast::routes(['middleware' => ['auth:sanctum']]);
+
     // Auth
     Route::post('auth/logout', [AuthController::class, 'logout']);
 

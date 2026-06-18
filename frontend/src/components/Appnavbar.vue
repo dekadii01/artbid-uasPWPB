@@ -1,9 +1,10 @@
 <script setup>
-import { ref, computed, onMounted, onUnmounted, h } from "vue";
+import { ref, computed, onMounted, onUnmounted, h, watch } from "vue";
 import { useRouter } from "vue-router";
 import { useAuthStore } from "../stores/auth";
 import { Icon } from "@iconify/vue";
 import { getNotifications, markAsRead, markAllAsRead } from "../api/notifications";
+import { getEcho } from "../api/echo";
 
 const router = useRouter();
 const auth = useAuthStore();
@@ -141,17 +142,74 @@ function handleClickOutside(e) {
     notifOpen.value = false;
   }
 }
+
+let echoUserChannel = null;
+
+function subscribeNotifications(userId) {
+  if (echoUserChannel) return;
+  try {
+    const echo = getEcho();
+    echoUserChannel = echo.private(`App.Models.User.${userId}`)
+      .listen("NotificationSent", (e) => {
+        console.log("Realtime notification received:", e);
+        
+        // Prepend the new notification
+        notifications.value.unshift({
+          id: e.id,
+          user_id: e.user_id,
+          type: e.type,
+          channel: e.channel,
+          title: e.title,
+          body: e.body,
+          data: e.data,
+          read_at: e.read_at,
+          created_at: e.created_at,
+        });
+      });
+  } catch (err) {
+    console.error("Gagal subscribe notifications:", err);
+  }
+}
+
+function unsubscribeNotifications(userId) {
+  if (echoUserChannel) {
+    try {
+      const echo = getEcho();
+      echo.leave(`App.Models.User.${userId}`);
+      echoUserChannel = null;
+    } catch (err) {
+      console.error("Gagal unsubscribe notifications:", err);
+    }
+  }
+}
+
+// Watch auth user state to subscribe/unsubscribe dynamically
+watch(
+  () => auth.user,
+  (newUser, oldUser) => {
+    if (newUser && newUser.id) {
+      subscribeNotifications(newUser.id);
+    } else if (oldUser && oldUser.id) {
+      unsubscribeNotifications(oldUser.id);
+    }
+  },
+  { immediate: true }
+);
+
 onMounted(() => {
   document.addEventListener("click", handleClickOutside);
   fetchNotifications();
-  // Poll setiap 30 detik
+  // Poll setiap 30 detik (as a fallback)
   notifInterval = setInterval(fetchNotifications, 30000);
 });
+
 onUnmounted(() => {
   document.removeEventListener("click", handleClickOutside);
   clearInterval(notifInterval);
-});
-</script>
+  if (auth.user && auth.user.id) {
+    unsubscribeNotifications(auth.user.id);
+  }
+});</script>
 
 <template>
   <nav

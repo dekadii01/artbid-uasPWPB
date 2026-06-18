@@ -2,6 +2,8 @@
 import { ref, computed, onMounted, onUnmounted } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import { Icon } from "@iconify/vue";
+import { useAuthStore } from "../../stores/auth";
+import { getEcho } from "../../api/echo";
 import {
   getAuction,
   placeBid as placeBidApi,
@@ -103,14 +105,127 @@ async function fetchAuction() {
   }
 }
 
+const authStore = useAuthStore();
+let echoChannel = null;
+
 onMounted(() => {
   fetchAuction();
 
-  // Simulasi viewer fluctuation
-  setInterval(() => {
-    const delta = Math.random() > 0.5 ? 1 : -1;
-    viewers.value = Math.max(5, Math.min(40, viewers.value + delta));
-  }, 5000);
+  try {
+    const echo = getEcho();
+    const auctionId = route.params.id;
+
+    // Join the presence channel to track active viewers and listen for bid updates
+    echoChannel = echo.join(`auction.${auctionId}`)
+      .here((users) => {
+        viewers.value = users.length;
+      })
+      .joining((user) => {
+        viewers.value++;
+        addNotif(`${user.name} bergabung menonton`, "info", "mdi:eye");
+      })
+      .leaving((user) => {
+        viewers.value = Math.max(1, viewers.value - 1);
+      })
+      .listen("BidPlaced", (e) => {
+        console.log("Realtime BidPlaced:", e);
+
+        if (auction.value && auction.value.id === e.auction_id) {
+          // Update current price, bids count, and ending time
+          auction.value.currentPrice = e.highest_bid;
+          auction.value.bidCount = e.bids_count;
+          if (e.ends_at) {
+            auction.value.endsAt = e.ends_at;
+          }
+
+          // Format new bid for history list
+          const isMe = authStore.user && authStore.user.id === e.bidder_id;
+          const displayUser = isMe ? "Anda" : e.bidder_name_masked;
+
+          const newBidItem = {
+            id: e.bid.id,
+            user: displayUser,
+            avatar: e.bid.avatar,
+            amount: e.bid.amount,
+            time: e.bid.time,
+            status: e.bid.status,
+          };
+
+          if (!auction.value.bids) {
+            auction.value.bids = [];
+          }
+          const exists = auction.value.bids.some(b => b.id === newBidItem.id);
+          if (!exists) {
+            auction.value.bids.unshift(newBidItem);
+          }
+
+          // Prepend to activity feed
+          const activityText = `${displayUser} mengajukan penawaran ${formatRupiah(e.amount)}`;
+          activityFeed.value.unshift({
+            id: e.bid.id,
+            icon: "mdi:gavel",
+            text: activityText,
+            time: e.bid.time,
+          });
+
+          // Update user leading/outbid status
+          const hasUserBid = auction.value.bids.some((b) => b.user === "Anda");
+          const isUserLeading = auction.value.bids[0]?.user === "Anda";
+          userBidStatus.value = isUserLeading ? "leading" : (hasUserBid ? "outbid" : "none");
+
+          // Reset bid amount input
+          if (bidAmount.value < minBid.value) {
+            bidAmount.value = minBid.value;
+          }
+
+          addNotif(
+            `${displayUser} menawar ${formatRupiah(e.amount)}`,
+            isMe ? "success" : "info",
+            "mdi:gavel"
+          );
+        }
+      })
+      .listen("AuctionEnded", (e) => {
+        console.log("Realtime AuctionEnded:", e);
+
+        if (auction.value && auction.value.id === e.auction_id) {
+          auction.value.status = "ended";
+          
+          if (e.winner_id) {
+            const isMe = authStore.user && authStore.user.id === e.winner_id;
+            userBidStatus.value = isMe ? "won" : "lost";
+            auction.value.winner = {
+              name: e.winner_name,
+              finalPrice: e.final_price,
+              paymentStatus: "pending",
+            };
+            
+            addNotif(
+              isMe ? "Selamat! Anda memenangkan lelang!" : `Lelang berakhir. Pemenang: ${e.winner_name}`,
+              isMe ? "success" : "info",
+              "mdi:trophy"
+            );
+          } else {
+            userBidStatus.value = "none";
+            addNotif("Lelang telah berakhir tanpa pemenang.", "info", "mdi:clock-end");
+          }
+        }
+      });
+  } catch (err) {
+    console.error("Gagal initialize Echo:", err);
+  }
+});
+
+onUnmounted(() => {
+  if (echoChannel) {
+    try {
+      const echo = getEcho();
+      const auctionId = route.params.id;
+      echo.leave(`auction.${auctionId}`);
+    } catch (err) {
+      console.error("Error leaving Echo channel:", err);
+    }
+  }
 });
 
 // ─── Computed dari data auction ───────────────────────────────────
