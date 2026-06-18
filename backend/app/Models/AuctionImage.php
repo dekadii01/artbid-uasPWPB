@@ -35,7 +35,13 @@ class AuctionImage extends Model
      */
     public function getUrlAttribute(): string
     {
-        return Storage::disk($this->storage_disk)->url($this->image_path);
+        if ($this->storage_disk === 'public') {
+            return Storage::disk('public')->url($this->image_path);
+        }
+
+        // Untuk r2/s3 — build URL langsung dari AWS_URL
+        return rtrim(config('filesystems.disks.r2.url'), '/')
+            . '/' . ltrim($this->image_path, '/');
     }
 
     protected $appends = ['url'];
