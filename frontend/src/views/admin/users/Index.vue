@@ -1,5 +1,6 @@
 <script setup>
-import { ref, computed } from "vue";
+import { ref, computed, onMounted } from "vue";
+import { getAdminUsers, updateAdminUser } from "../../../api/admin";
 
 // ─── System alerts ───────────────────────────────────────────
 const systemAlerts = [
@@ -23,48 +24,8 @@ const systemAlerts = [
   },
 ];
 
-// ─── Stats ───────────────────────────────────────────────────
-const stats = [
-  {
-    label: "Total Pengguna",
-    value: "1.245",
-    sub: "Seluruh akun terdaftar",
-    filter: "all",
-    dark: false,
-    icon: "M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z",
-  },
-  {
-    label: "Pengguna Aktif",
-    value: "1.120",
-    sub: "Aktif menggunakan platform",
-    filter: "active",
-    dark: true,
-    icon: "M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z",
-  },
-  {
-    label: "Baru Bulan Ini",
-    value: "25",
-    sub: "Registrasi bulan berjalan",
-    filter: "new",
-    dark: false,
-    icon: "M18 9v3m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0112 0v1H3v-1z",
-  },
-  {
-    label: "Pengguna Diblokir",
-    value: "8",
-    sub: "Dinonaktifkan administrator",
-    filter: "blocked",
-    dark: false,
-    icon: "M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636",
-  },
-];
-
-// ─── Filters ─────────────────────────────────────────────────
-const statusFilters = [
-  { label: "Semua", value: "all", count: 1245 },
-  { label: "Aktif", value: "active", count: 1120 },
-  { label: "Diblokir", value: "blocked", count: 8 },
-];
+const isLoading = ref(true);
+const isError = ref(false);
 
 const activeFilter = ref("all");
 const filterActivity = ref("");
@@ -74,253 +35,87 @@ const currentPage = ref(1);
 const perPage = 8;
 
 // ─── Users data ──────────────────────────────────────────────
-const users = ref([
+const users = ref([]);
+
+async function fetchData() {
+  isLoading.value = true;
+  isError.value = false;
+  try {
+    const res = await getAdminUsers();
+    users.value = res.data.users;
+    
+    if (selectedId.value) {
+      const found = users.value.find((u) => u.id === selectedId.value);
+      if (found) {
+        selectedUser.value = found;
+      } else {
+        selectedId.value = null;
+        selectedUser.value = null;
+      }
+    }
+  } catch (err) {
+    console.error("Gagal mengambil data pengguna:", err);
+    isError.value = true;
+  } finally {
+    isLoading.value = false;
+  }
+}
+
+onMounted(() => {
+  fetchData();
+});
+
+// ─── Computed Stats ──────────────────────────────────────────
+const totalUsersCount = computed(() => users.value.length);
+const activeUsersCount = computed(() => users.value.filter((u) => u.status === "active").length);
+const blockedUsersCount = computed(() => users.value.filter((u) => u.status === "blocked").length);
+const newUsersCount = computed(() => {
+  const currentMonthYear = new Date().toLocaleString("en-US", { month: "short", year: "numeric" });
+  return users.value.filter((u) => u.joinedAt.includes(currentMonthYear)).length;
+});
+
+const stats = computed(() => [
   {
-    id: 1,
-    name: "I Putu Arya",
-    email: "putuarya@gmail.com",
-    phone: "+62 812-0001-0001",
-    role: "Kolektor",
-    joinedAt: "10 Jan 2026",
-    status: "active",
-    totalAuctions: 8,
-    totalBids: 52,
-    wonAuctions: 6,
-    watchlist: 15,
-    recentActivity: [
-      {
-        text: 'Membuat lelang baru "Patung Garuda Bali"',
-        time: "2 jam lalu",
-        dark: false,
-        icon: "M12 4v16m8-8H4",
-      },
-      {
-        text: "Melakukan penawaran Rp 12.500.000 pada lelang",
-        time: "5 jam lalu",
-        dark: true,
-        icon: "M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z",
-      },
-      {
-        text: 'Memenangkan lelang "Topeng Barong Antik"',
-        time: "1 hari lalu",
-        dark: false,
-        icon: "M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z",
-      },
-    ],
-    auctionHistory: [
-      {
-        name: "Patung Garuda Bali",
-        finalPrice: 15000000,
-        totalBids: 38,
-        status: "active",
-      },
-      {
-        name: "Ukiran Kayu Garuda",
-        finalPrice: 18000000,
-        totalBids: 48,
-        status: "ended",
-      },
-    ],
-    bidHistory: [
-      {
-        name: "Lukisan Bali Klasik",
-        amount: 12500000,
-        time: "12 Jun 2026",
-        bidStatus: "leading",
-      },
-      {
-        name: "Harmoni Semesta",
-        amount: 9500000,
-        time: "10 Jun 2026",
-        bidStatus: "outbid",
-      },
-      {
-        name: "Topeng Barong",
-        amount: 8750000,
-        time: "9 Jun 2026",
-        bidStatus: "won",
-      },
-    ],
+    label: "Total Pengguna",
+    value: totalUsersCount.value.toLocaleString("id-ID"),
+    sub: "Seluruh akun terdaftar",
+    filter: "all",
+    dark: false,
+    icon: "M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z",
   },
   {
-    id: 2,
-    name: "Ni Luh Ratna",
-    email: "niluhratna@gmail.com",
-    phone: "+62 813-0002-0002",
-    role: "Kolektor",
-    joinedAt: "15 Feb 2026",
-    status: "active",
-    totalAuctions: 5,
-    totalBids: 47,
-    wonAuctions: 4,
-    watchlist: 22,
-    recentActivity: [],
-    auctionHistory: [],
-    bidHistory: [],
+    label: "Pengguna Aktif",
+    value: activeUsersCount.value.toLocaleString("id-ID"),
+    sub: "Aktif menggunakan platform",
+    filter: "active",
+    dark: true,
+    icon: "M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z",
   },
   {
-    id: 3,
-    name: "Ketut Wirawan",
-    email: "ketutwirawan@gmail.com",
-    phone: "+62 814-0003-0003",
-    role: "Seniman",
-    joinedAt: "3 Mar 2026",
-    status: "active",
-    totalAuctions: 12,
-    totalBids: 8,
-    wonAuctions: 1,
-    watchlist: 5,
-    recentActivity: [],
-    auctionHistory: [],
-    bidHistory: [],
+    label: "Baru Bulan Ini",
+    value: newUsersCount.value.toLocaleString("id-ID"),
+    sub: "Registrasi bulan berjalan",
+    filter: "new",
+    dark: false,
+    icon: "M18 9v3m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0112 0v1H3v-1z",
   },
   {
-    id: 4,
-    name: "Wayan Sudira",
-    email: "wayansudira@gmail.com",
-    phone: "+62 815-0004-0004",
-    role: "Kolektor",
-    joinedAt: "22 Jan 2026",
-    status: "active",
-    totalAuctions: 3,
-    totalBids: 29,
-    wonAuctions: 2,
-    watchlist: 18,
-    recentActivity: [],
-    auctionHistory: [],
-    bidHistory: [],
-  },
-  {
-    id: 5,
-    name: "Gede Mahendra",
-    email: "gedemahendra@gmail.com",
-    phone: "+62 816-0005-0005",
-    role: "Kolektor",
-    joinedAt: "5 Apr 2026",
-    status: "active",
-    totalAuctions: 1,
-    totalBids: 34,
-    wonAuctions: 3,
-    watchlist: 12,
-    recentActivity: [],
-    auctionHistory: [],
-    bidHistory: [],
-  },
-  {
-    id: 6,
-    name: "Made Ayu Sari",
-    email: "madeayusari@gmail.com",
-    phone: "+62 817-0006-0006",
-    role: "Seniman",
-    joinedAt: "19 Feb 2026",
-    status: "active",
-    totalAuctions: 9,
-    totalBids: 2,
-    wonAuctions: 0,
-    watchlist: 3,
-    recentActivity: [],
-    auctionHistory: [],
-    bidHistory: [],
-  },
-  {
-    id: 7,
-    name: "Putu Hartawan",
-    email: "putuhartawan@gmail.com",
-    phone: "+62 818-0007-0007",
-    role: "Kolektor",
-    joinedAt: "8 Mei 2026",
-    status: "blocked",
-    totalAuctions: 0,
-    totalBids: 6,
-    wonAuctions: 0,
-    watchlist: 4,
-    recentActivity: [],
-    auctionHistory: [],
-    bidHistory: [],
-  },
-  {
-    id: 8,
-    name: "Ni Made Dewi",
-    email: "nimadedewi@gmail.com",
-    phone: "+62 819-0008-0008",
-    role: "Kolektor",
-    joinedAt: "2 Jun 2026",
-    status: "active",
-    totalAuctions: 0,
-    totalBids: 3,
-    wonAuctions: 0,
-    watchlist: 8,
-    recentActivity: [],
-    auctionHistory: [],
-    bidHistory: [],
-  },
-  {
-    id: 9,
-    name: "Komang Bayu",
-    email: "komangbayu@gmail.com",
-    phone: "+62 820-0009-0009",
-    role: "Kolektor",
-    joinedAt: "11 Jun 2026",
-    status: "active",
-    totalAuctions: 2,
-    totalBids: 15,
-    wonAuctions: 1,
-    watchlist: 9,
-    recentActivity: [],
-    auctionHistory: [],
-    bidHistory: [],
-  },
-  {
-    id: 10,
-    name: "Sang Ayu Riani",
-    email: "sangriani@gmail.com",
-    phone: "+62 821-0010-0010",
-    role: "Seniman",
-    joinedAt: "14 Jun 2026",
-    status: "active",
-    totalAuctions: 6,
-    totalBids: 0,
-    wonAuctions: 0,
-    watchlist: 0,
-    recentActivity: [],
-    auctionHistory: [],
-    bidHistory: [],
-  },
-  {
-    id: 11,
-    name: "Budi Santoso",
-    email: "budisantoso@gmail.com",
-    phone: "+62 822-0011-0011",
-    role: "Kolektor",
-    joinedAt: "28 Jan 2026",
-    status: "active",
-    totalAuctions: 0,
-    totalBids: 41,
-    wonAuctions: 5,
-    watchlist: 28,
-    recentActivity: [],
-    auctionHistory: [],
-    bidHistory: [],
-  },
-  {
-    id: 12,
-    name: "I Made Sudarma",
-    email: "imadesudarma@gmail.com",
-    phone: "+62 823-0012-0012",
-    role: "Seniman",
-    joinedAt: "7 Mar 2026",
-    status: "blocked",
-    totalAuctions: 8,
-    totalBids: 5,
-    wonAuctions: 0,
-    watchlist: 2,
-    recentActivity: [],
-    auctionHistory: [],
-    bidHistory: [],
+    label: "Pengguna Diblokir",
+    value: blockedUsersCount.value.toLocaleString("id-ID"),
+    sub: "Dinonaktifkan administrator",
+    filter: "blocked",
+    dark: false,
+    icon: "M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636",
   },
 ]);
 
-// ─── Computed ────────────────────────────────────────────────
+const statusFilters = computed(() => [
+  { label: "Semua", value: "all", count: totalUsersCount.value },
+  { label: "Aktif", value: "active", count: activeUsersCount.value },
+  { label: "Diblokir", value: "blocked", count: blockedUsersCount.value },
+]);
+
+// ─── Computed Filtering ──────────────────────────────────────
 const filteredUsers = computed(() => {
   let list = [...users.value];
 
@@ -336,8 +131,10 @@ const filteredUsers = computed(() => {
     list = list.filter((u) => u.status === "active");
   if (activeFilter.value === "blocked")
     list = list.filter((u) => u.status === "blocked");
-  if (activeFilter.value === "new")
-    list = list.filter((u) => u.joinedAt.includes("2026"));
+  if (activeFilter.value === "new") {
+    const currentMonthYear = new Date().toLocaleString("en-US", { month: "short", year: "numeric" });
+    list = list.filter((u) => u.joinedAt.includes(currentMonthYear));
+  }
 
   if (filterActivity.value === "has_auction")
     list = list.filter((u) => u.totalAuctions > 0);
@@ -408,16 +205,19 @@ function confirmAction(action, user) {
   confirmTarget.value = { action, user };
 }
 
-function handleConfirm() {
+async function handleConfirm() {
   if (!confirmTarget.value) return;
   const { action, user } = confirmTarget.value;
-  const target = users.value.find((u) => u.id === user.id);
-  if (target) {
-    target.status = action === "block" ? "blocked" : "active";
-    if (selectedUser.value?.id === target.id)
-      selectedUser.value = { ...target };
+  try {
+    const newStatus = action === "block" ? "blocked" : "active";
+    await updateAdminUser(user.id, { status: newStatus });
+    await fetchData();
+  } catch (err) {
+    console.error("Gagal mengubah status pengguna:", err);
+    alert(err.response?.data?.message || "Gagal mengubah status.");
+  } finally {
+    confirmTarget.value = null;
   }
-  confirmTarget.value = null;
 }
 
 // ─── Side panel data ─────────────────────────────────────────
@@ -435,10 +235,12 @@ const newUsers = computed(() =>
 
 // ─── Helpers ─────────────────────────────────────────────────
 function formatRp(val) {
+  if (val === undefined || val === null) return "Rp 0";
   return "Rp " + val.toLocaleString("id-ID");
 }
 
 function initials(name) {
+  if (!name) return "";
   return name
     .split(" ")
     .map((w) => w[0])
@@ -458,6 +260,7 @@ const palette = [
   "#374151",
 ];
 function avatarColor(name) {
+  if (!name) return palette[0];
   const idx = name.charCodeAt(0) % palette.length;
   return palette[idx];
 }
@@ -489,7 +292,32 @@ function bidStatusStyle(status) {
 }
 
 function exportData() {
-  console.log("Export data pengguna");
+  if (users.value.length === 0) return;
+  const headers = ["ID", "Nama", "Email", "Phone", "Role", "Bergabung", "Status", "Total Lelang", "Total Bids", "Won Auctions"];
+  const rows = users.value.map((u) => [
+    u.id,
+    u.name,
+    u.email,
+    `="${u.phone}"`,
+    u.role,
+    u.joinedAt,
+    u.status,
+    u.totalAuctions,
+    u.totalBids,
+    u.wonAuctions
+  ]);
+  
+  const csvContent = [headers.join(","), ...rows.map((r) => r.map((val) => `"${String(val).replace(/"/g, '""')}"`).join(","))].join("\n");
+  
+  const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.setAttribute("href", url);
+  link.setAttribute("download", `daftar_pengguna_${new Date().toISOString().slice(0, 10)}.csv`);
+  link.style.visibility = "hidden";
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
 }
 </script>
 
@@ -751,8 +579,26 @@ function exportData() {
       </div>
     </div>
 
+    <!-- Loading state -->
+    <div v-if="isLoading" class="flex flex-col items-center justify-center py-32 bg-white rounded-2xl border border-gray-100">
+      <div class="w-8 h-8 border-2 border-black border-t-transparent rounded-full animate-spin mb-4"></div>
+      <p class="text-xs text-gray-500 font-medium">Memuat data pengguna...</p>
+    </div>
+
+    <!-- Error state -->
+    <div v-else-if="isError" class="py-32 text-center bg-white rounded-2xl border border-gray-100">
+      <svg class="w-12 h-12 text-gray-400 mx-auto mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/>
+      </svg>
+      <p class="font-medium text-gray-700 text-sm mb-1">Gagal memuat data pengguna</p>
+      <p class="text-gray-400 text-xs mb-4">Terjadi kesalahan pada server.</p>
+      <button @click="fetchData" class="px-4 py-2 bg-black text-white rounded-lg text-xs font-medium hover:bg-gray-800 transition-colors">
+        Coba Lagi
+      </button>
+    </div>
+
     <!-- ═══════════════════ MAIN CONTENT ═══════════════════ -->
-    <div class="grid grid-cols-1 xl:grid-cols-3 gap-6">
+    <div v-else class="grid grid-cols-1 xl:grid-cols-3 gap-6">
       <!-- ── TABLE ── -->
       <div class="xl:col-span-2 space-y-4">
         <div
