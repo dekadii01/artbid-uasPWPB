@@ -255,40 +255,329 @@ class AuctionController extends Controller
     /**
      * Display a listing of the resource.
      */
-    public function index()
+    public function index(Request $request): JsonResponse
     {
-        //
+        $auctions = Auction::withTrashed()
+            ->with(['mainImage', 'category', 'seller'])
+            ->withCount(['bids', 'watchers'])
+            ->latest()
+            ->get();
+
+        $sellerIds = $auctions->pluck('seller_id')->unique();
+        $sellerAuctionsCounts = Auction::whereIn('seller_id', $sellerIds)
+            ->groupBy('seller_id')
+            ->selectRaw('seller_id, count(*) as count')
+            ->pluck('count', 'seller_id');
+
+        $statusMap = [
+            'scheduled' => 'upcoming',
+            'active'    => 'active',
+            'ended'     => 'ended',
+            'cancelled' => 'cancelled',
+        ];
+
+        $transformed = $auctions->map(function ($a) use ($sellerAuctionsCounts, $statusMap) {
+            $status = $statusMap[$a->status] ?? $a->status;
+            if ($a->trashed()) {
+                $status = 'deleted';
+            }
+
+            return [
+                'id'             => $a->id,
+                'name'           => $a->title,
+                'seller'         => $a->seller?->full_name ?? '—',
+                'sellerEmail'    => $a->seller?->email ?? '—',
+                'sellerAuctions' => $sellerAuctionsCounts[$a->seller_id] ?? 0,
+                'category'       => $a->category?->name ?? '—',
+                'image'          => $a->mainImage?->url ?? 'https://images.unsplash.com/photo-1579783902614-a3fb3927b6a5?w=200&q=80',
+                'startPrice'     => (float) $a->starting_price,
+                'currentPrice'   => (float) $a->current_price,
+                'totalBids'      => $a->bids_count ?? 0,
+                'watching'       => $a->watchers_count ?? 0,
+                'status'         => $status,
+                'startsAt'       => $a->starts_at?->toIso8601String(),
+                'endsAt'         => $a->ends_at?->toIso8601String(),
+                'startDate'      => $a->starts_at ? $a->starts_at->setTimezone('Asia/Makassar')->format('d M Y, H.i') : '—',
+                'endDate'        => $a->ends_at ? $a->ends_at->setTimezone('Asia/Makassar')->format('d M Y, H.i') . ' WITA' : '—',
+                'description'    => $a->description,
+            ];
+        });
+
+        // Compute summary counts
+        $total = Auction::withTrashed()->count();
+        $active = Auction::where('status', 'active')->count();
+        $upcoming = Auction::where('status', 'scheduled')->count();
+        $ended = Auction::where('status', 'ended')->count();
+        $deleted = Auction::onlyTrashed()->count();
+
+        // System alerts
+        $systemAlerts = [];
+        if ($upcoming > 0) {
+            $systemAlerts[] = [
+                'text'   => "Terdapat {$upcoming} lelang yang menunggu verifikasi admin.",
+                'action' => "Verifikasi Sekarang",
+                'dark'   => true,
+                'icon'   => "M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2",
+            ];
+        }
+
+        // ending in 1 hour
+        $endingSoonCount = Auction::where('status', 'active')
+            ->where('ends_at', '>', now())
+            ->where('ends_at', '<=', now()->addHour())
+            ->count();
+        if ($endingSoonCount > 0) {
+            $systemAlerts[] = [
+                'text'   => "Terdapat {$endingSoonCount} lelang yang akan berakhir dalam 1 jam ke depan.",
+                'action' => "Pantau",
+                'dark'   => false,
+                'icon'   => "M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z",
+            ];
+        }
+
+        // Segera berakhir list
+        $endingSoonList = Auction::where('status', 'active')
+            ->with(['mainImage'])
+            ->withCount('bids')
+            ->orderBy('ends_at')
+            ->limit(3)
+            ->get()
+            ->map(function ($a) {
+                $countdown = '00:00:00';
+                if ($a->ends_at) {
+                    $diff = now()->diff($a->ends_at);
+                    if (now()->lessThan($a->ends_at)) {
+                        $hours = ($diff->d * 24) + $diff->h;
+                        $countdown = sprintf('%02d:%02d:%02d', $hours, $diff->i, $diff->s);
+                    }
+                }
+                return [
+                    'id'           => $a->id,
+                    'name'         => $a->title,
+                    'image'        => $a->mainImage?->url ?? 'https://images.unsplash.com/photo-1579783902614-a3fb3927b6a5?w=100&q=80',
+                    'currentPrice' => (float) $a->current_price,
+                    'totalBids'    => $a->bids_count,
+                    'countdown'    => $countdown,
+                    'endsAt'       => $a->ends_at?->toIso8601String(),
+                ];
+            });
+
+        // Most active list (top 4 active by bids_count)
+        $mostActiveList = Auction::where('status', 'active')
+            ->with(['mainImage'])
+            ->withCount(['bids', 'watchers'])
+            ->orderByDesc('bids_count')
+            ->limit(4)
+            ->get()
+            ->map(function ($a) {
+                return [
+                    'id'           => $a->id,
+                    'name'         => $a->title,
+                    'image'        => $a->mainImage?->url ?? 'https://images.unsplash.com/photo-1579783902614-a3fb3927b6a5?w=100&q=80',
+                    'totalBids'    => $a->bids_count,
+                    'watching'     => $a->watchers_count,
+                    'currentPrice' => (float) $a->current_price,
+                ];
+            });
+
+        return response()->json([
+            'auctions'     => $transformed,
+            'categories'   => Category::pluck('name')->toArray(),
+            'stats'        => [
+                ['label' => 'Total Lelang', 'value' => (string) $total, 'sub' => 'Seluruh lelang dibuat', 'filter' => 'all', 'dark' => false, 'icon' => 'M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2'],
+                ['label' => 'Lelang Aktif', 'value' => (string) $active, 'sub' => 'Sedang berlangsung', 'filter' => 'active', 'dark' => true, 'icon' => 'M13 10V3L4 14h7v7l9-11h-7z'],
+                ['label' => 'Akan Datang', 'value' => (string) $upcoming, 'sub' => 'Belum dimulai', 'filter' => 'upcoming', 'dark' => false, 'icon' => 'M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z'],
+                ['label' => 'Dihapus', 'value' => (string) $deleted, 'sub' => 'Lelang yang dihapus', 'filter' => 'deleted', 'dark' => false, 'icon' => 'M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16'],
+            ],
+            'statusFilters' => [
+                ['label' => 'Semua', 'value' => 'all', 'count' => $total],
+                ['label' => 'Akan Datang', 'value' => 'upcoming', 'count' => $upcoming],
+                ['label' => 'Sedang Berlangsung', 'value' => 'active', 'count' => $active],
+                ['label' => 'Selesai', 'value' => 'ended', 'count' => $ended],
+                ['label' => 'Dihapus', 'value' => 'deleted', 'count' => $deleted],
+            ],
+            'systemAlerts' => $systemAlerts,
+            'endingSoon'   => $endingSoonList,
+            'mostActive'   => $mostActiveList,
+        ]);
     }
 
     /**
-     * Store a newly created resource in storage.
+     * Activate a scheduled auction.
      */
-    public function store(Request $request)
+    public function activate($id): JsonResponse
     {
-        //
+        try {
+            $auction = Auction::withTrashed()->findOrFail($id);
+
+            if ($auction->status !== 'scheduled') {
+                return response()->json(['message' => 'Lelang hanya dapat diaktifkan jika berstatus Akan Datang.'], 422);
+            }
+
+            $now = now();
+            $durationSeconds = 86400; // default 24h
+            if ($auction->starts_at && $auction->ends_at) {
+                $durationSeconds = max(60, $auction->ends_at->diffInSeconds($auction->starts_at));
+            }
+
+            $auction->status = 'active';
+            $auction->starts_at = $now;
+            $auction->ends_at = $now->copy()->addSeconds($durationSeconds);
+            $auction->save();
+
+            return response()->json([
+                'message' => 'Lelang berhasil diaktifkan.',
+                'auction' => $auction,
+            ]);
+        } catch (\Exception $e) {
+            return response()->json([
+                'message' => 'Gagal mengaktifkan lelang: ' . $e->getMessage()
+            ], 500);
+        }
     }
 
     /**
-     * Display the specified resource.
+     * Force end an active auction.
      */
-    public function show(string $id)
+    public function forceEnd($id): JsonResponse
     {
-        //
+        try {
+            $auction = Auction::withTrashed()->findOrFail($id);
+
+            if ($auction->status !== 'active') {
+                return response()->json(['message' => 'Hanya lelang aktif yang dapat dihentikan.'], 422);
+            }
+
+            \Illuminate\Support\Facades\DB::transaction(function () use ($auction) {
+                // Lock the auction
+                $lockedAuction = Auction::lockForUpdate()->find($auction->id);
+
+                if ($lockedAuction->status !== 'active') {
+                    return;
+                }
+
+                // Get the highest active bid
+                $highestBid = Bid::where('auction_id', $lockedAuction->id)
+                    ->where('status', 'active')
+                    ->orderByDesc('amount')
+                    ->first();
+
+                if ($highestBid) {
+                    // Mark this bid as won
+                    $highestBid->update(['status' => 'won']);
+
+                    // Declare winner
+                    $winner = AuctionWinner::create([
+                        'auction_id'     => $lockedAuction->id,
+                        'winner_id'      => $highestBid->bidder_id,
+                        'winning_bid_id' => $highestBid->id,
+                        'final_price'    => $highestBid->amount,
+                    ]);
+
+                    // Set auction status to ended
+                    $lockedAuction->status = 'ended';
+                    $lockedAuction->ends_at = now();
+                    $lockedAuction->save();
+
+                    // Notify winner
+                    $winnerUser = $highestBid->bidder;
+                    $winnerNotif = \App\Models\Notification::create([
+                        'user_id' => $highestBid->bidder_id,
+                        'type'    => 'auction_won',
+                        'channel' => 'private',
+                        'title'   => 'Lelang Dimenangkan!',
+                        'body'    => "Selamat! Anda telah memenangkan lelang \"" . $lockedAuction->title . "\" dengan penawaran tertinggi sebesar Rp " . number_format($highestBid->amount) . ".",
+                        'data'    => [
+                            'auction_id'    => $lockedAuction->id,
+                            'auction_title' => $lockedAuction->title,
+                            'price'         => (float) $highestBid->amount,
+                        ],
+                    ]);
+                    event(new \App\Events\NotificationSent($winnerNotif));
+
+                    // Notify seller
+                    $sellerNotif = \App\Models\Notification::create([
+                        'user_id' => $lockedAuction->seller_id,
+                        'type'    => 'auction_ended',
+                        'channel' => 'private',
+                        'title'   => 'Barang Anda Terjual!',
+                        'body'    => "Lelang \"" . $lockedAuction->title . "\" Anda telah selesai dan dimenangkan oleh " . ($winnerUser->full_name ?? 'Penawar') . " senilai Rp " . number_format($highestBid->amount) . ".",
+                        'data'    => [
+                            'auction_id'    => $lockedAuction->id,
+                            'auction_title' => $lockedAuction->title,
+                            'price'         => (float) $highestBid->amount,
+                        ],
+                    ]);
+                    event(new \App\Events\NotificationSent($sellerNotif));
+
+                    // Broadcast AuctionEnded event to viewers
+                    event(new \App\Events\AuctionEnded(
+                        $lockedAuction->id,
+                        'ended',
+                        $highestBid->bidder_id,
+                        $winnerUser->full_name ?? 'Pemenang',
+                        (float) $highestBid->amount
+                    ));
+
+                } else {
+                    // Ended without bids
+                    $lockedAuction->status = 'ended';
+                    $lockedAuction->ends_at = now();
+                    $lockedAuction->save();
+
+                    // Notify seller
+                    $sellerNotif = \App\Models\Notification::create([
+                        'user_id' => $lockedAuction->seller_id,
+                        'type'    => 'auction_ended',
+                        'channel' => 'private',
+                        'title'   => 'Lelang Berakhir Tanpa Penawaran',
+                        'body'    => "Lelang \"" . $lockedAuction->title . "\" Anda telah berakhir, namun tidak ada penawaran yang masuk.",
+                        'data'    => [
+                            'auction_id'    => $lockedAuction->id,
+                            'auction_title' => $lockedAuction->title,
+                            'price'         => 0.0,
+                        ],
+                    ]);
+                    event(new \App\Events\NotificationSent($sellerNotif));
+
+                    // Broadcast AuctionEnded event to viewers
+                    event(new \App\Events\AuctionEnded(
+                        $lockedAuction->id,
+                        'ended',
+                        null,
+                        null,
+                        0.0
+                    ));
+                }
+            });
+
+            return response()->json([
+                'message' => 'Lelang berhasil dihentikan.',
+            ]);
+
+        } catch (\Exception $e) {
+            return response()->json([
+                'message' => 'Gagal menghentikan lelang: ' . $e->getMessage(),
+            ], 500);
+        }
     }
 
     /**
-     * Update the specified resource in storage.
+     * Delete an auction (soft delete).
      */
-    public function update(Request $request, string $id)
+    public function destroy($id): JsonResponse
     {
-        //
-    }
+        try {
+            $auction = Auction::withTrashed()->findOrFail($id);
+            $auction->delete();
 
-    /**
-     * Remove the specified resource from storage.
-     */
-    public function destroy(string $id)
-    {
-        //
+            return response()->json([
+                'message' => 'Lelang berhasil dihapus oleh admin.',
+            ]);
+        } catch (\Exception $e) {
+            return response()->json([
+                'message' => 'Gagal menghapus lelang: ' . $e->getMessage()
+            ], 500);
+        }
     }
 }
