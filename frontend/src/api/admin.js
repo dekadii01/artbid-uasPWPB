@@ -63,5 +63,16 @@ export const updateAdminUser = (id, data) => {
   return api.put(`/admin/users/${id}`, data);
 };
 
+/**
+ * Get admin report statistics based on period and custom dates.
+ */
+export const getAdminReports = (params) => {
+  return api.get("/admin/reports", { params });
+};
 
-
+/**
+ * Export admin report as CSV blob.
+ */
+export const exportAdminReport = (params) => {
+  return api.get("/admin/reports/export", { params, responseType: "blob" });
+};

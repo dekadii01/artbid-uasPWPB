@@ -1,5 +1,7 @@
 <script setup>
-import { ref, computed } from "vue";
+import { ref, computed, watch, onMounted, onUnmounted } from "vue";
+import { getAdminReports, exportAdminReport } from "../../../api/admin";
+import { getEcho } from "../../../api/echo";
 
 // ─── Period filter ────────────────────────────────────────────
 const activePeriod = ref("month");
@@ -14,204 +16,278 @@ const periods = [
   { label: "Custom", value: "custom" },
 ];
 
-// ─── Stats ────────────────────────────────────────────────────
-const stats = [
-  {
-    label: "Total Pengguna",
-    value: "1.245",
-    sub: "Seluruh akun terdaftar",
-    dark: false,
-    icon: "M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z",
-  },
-  {
-    label: "Pengguna Baru",
-    value: "25",
-    sub: "Periode yang dipilih",
-    dark: false,
-    icon: "M18 9v3m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0112 0v1H3v-1z",
-  },
-  {
-    label: "Total Lelang",
-    value: "325",
-    sub: "Lelang dibuat",
-    dark: true,
-    icon: "M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10",
-  },
-  {
-    label: "Total Penawaran",
-    value: "5.280",
-    sub: "Aktivitas bidding",
-    dark: false,
-    icon: "M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z",
-  },
-  {
-    label: "Nilai Transaksi",
-    value: "Rp 1,25M",
-    sub: "Akumulasi lelang selesai",
-    dark: false,
-    icon: "M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z",
-  },
-  {
-    label: "Lelang Aktif",
-    value: "78",
-    sub: "Sedang berlangsung",
-    dark: false,
-    icon: "M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z",
-  },
+const defaultStatsConfig = {
+  "Total Pengguna": { dark: false, icon: "M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z" },
+  "Pengguna Baru": { dark: false, icon: "M18 9v3m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0112 0v1H3v-1z" },
+  "Total Lelang": { dark: true, icon: "M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" },
+  "Total Penawaran": { dark: false, icon: "M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" },
+  "Nilai Transaksi": { dark: false, icon: "M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" },
+  "Lelang Aktif": { dark: false, icon: "M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" }
+};
+
+const defaultRealtimeConfig = {
+  "Pengguna Online": { icon: "M5.121 17.804A13.937 13.937 0 0112 16c2.5 0 4.847.655 6.879 1.804M15 10a3 3 0 11-6 0 3 3 0 016 0z" },
+  "Viewer Aktif": { icon: "M15 12a3 3 0 11-6 0 3 3 0 016 0z M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" },
+  "Lelang Berlangsung": { icon: "M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" },
+  "Bid (1 jam)": { icon: "M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" }
+};
+
+// ─── States ────────────────────────────────────────────────────
+const stats = ref([]);
+const userGrowthData = ref([]);
+const auctionChartData = ref([]);
+const bidChartData = ref([]);
+const categoryStats = ref([]);
+const topAuctions = ref([]);
+const topUsers = ref([]);
+const realtimeStats = ref([]);
+const systemActivity = ref([]);
+const salesStats = ref([]);
+const topItem = ref({ name: "Tidak ada", price: 0 });
+
+const colorsClass = ["bg-gray-800", "bg-gray-500", "bg-gray-300", "bg-gray-200"];
+const exportOptions = [
+  { label: "Laporan Pengguna", type: "users" },
+  { label: "Laporan Lelang", type: "auctions" },
+  { label: "Laporan Penawaran", type: "bids" },
+  { label: "Laporan Transaksi", type: "transactions" },
+  { label: "Laporan Kategori", type: "categories" },
 ];
 
-// ─── Chart data (user growth - line chart) ────────────────────
-const userGrowthData = [
-  { label: "Jan", value: 80 },
-  { label: "Feb", value: 110 },
-  { label: "Mar", value: 95 },
-  { label: "Apr", value: 140 },
-  { label: "Mei", value: 125 },
-  { label: "Jun", value: 160 },
-];
-
-const auctionChartData = [
-  { label: "Jan", new: 30, active: 45, ended: 20 },
-  { label: "Feb", new: 42, active: 60, ended: 35 },
-  { label: "Mar", new: 28, active: 55, ended: 40 },
-  { label: "Apr", new: 55, active: 72, ended: 48 },
-  { label: "Mei", new: 48, active: 65, ended: 55 },
-  { label: "Jun", new: 62, active: 78, ended: 60 },
-];
-
-const bidChartData = [
-  { label: "Jan", value: 620 },
-  { label: "Feb", value: 840 },
-  { label: "Mar", value: 730 },
-  { label: "Apr", value: 980 },
-  { label: "Mei", value: 890 },
-  { label: "Jun", value: 1220 },
-];
-
-// ─── Category stats ───────────────────────────────────────────
-const categoryStats = [
-  { name: "Lukisan", auctions: 125, bids: 1250, pct: 38 },
-  { name: "Patung", auctions: 87, bids: 890, pct: 27 },
-  { name: "Barang Antik", auctions: 68, bids: 740, pct: 21 },
-  { name: "Topeng Tradisional", auctions: 45, bids: 520, pct: 14 },
-];
-
-// ─── Top auctions ─────────────────────────────────────────────
-const topAuctions = [
-  {
-    name: "Lukisan Bali Klasik",
-    seller: "I Made Sudarma",
-    bids: 45,
-    price: 12500000,
-  },
-  {
-    name: "Patung Garuda Bali",
-    seller: "I Putu Arya",
-    bids: 38,
-    price: 15000000,
-  },
-  {
-    name: "Topeng Barong Antik",
-    seller: "Ni Luh Ratna",
-    bids: 35,
-    price: 7500000,
-  },
-  {
-    name: "Keris Pusaka Jawa",
-    seller: "Budi Santoso",
-    bids: 29,
-    price: 22000000,
-  },
-  {
-    name: "Ukiran Kayu Garuda",
-    seller: "Ketut Wirawan",
-    bids: 24,
-    price: 18000000,
-  },
-];
-
-// ─── Top users ────────────────────────────────────────────────
-const topUsers = [
-  { name: "I Putu Arya", bids: 120, auctions: 8, won: 6 },
-  { name: "Ni Luh Ratna", bids: 95, auctions: 5, won: 4 },
-  { name: "Kadek Wijaya", bids: 88, auctions: 3, won: 5 },
-  { name: "Budi Santoso", bids: 75, auctions: 0, won: 5 },
-  { name: "Wayan Sudira", bids: 62, auctions: 3, won: 2 },
-];
-
-// ─── Realtime stats ───────────────────────────────────────────
-const realtimeStats = [
-  {
-    label: "Pengguna Online",
-    value: "42",
-    icon: "M5.121 17.804A13.937 13.937 0 0112 16c2.5 0 4.847.655 6.879 1.804M15 10a3 3 0 11-6 0 3 3 0 016 0z",
-  },
-  {
-    label: "Viewer Aktif",
-    value: "67",
-    icon: "M15 12a3 3 0 11-6 0 3 3 0 016 0z M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z",
-  },
-  {
-    label: "Lelang Berlangsung",
-    value: "78",
-    icon: "M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z",
-  },
-  { label: "Bid (1 jam)", value: "25", icon: "M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" },
-];
-
-// ─── System activity ──────────────────────────────────────────
-const systemActivity = [
-  {
-    text: "25 pengguna baru berhasil mendaftar hari ini.",
-    time: "Hari ini",
-    dark: false,
-    icon: "M18 9v3m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0112 0v1H3v-1z",
-  },
-  {
-    text: "12 lelang baru dibuat dalam 24 jam terakhir.",
-    time: "24 jam lalu",
-    dark: true,
-    icon: "M12 4v16m8-8H4",
-  },
-  {
-    text: 'Lelang "Patung Garuda Bali" berhasil mencapai harga Rp 15.000.000.',
-    time: "2 jam lalu",
-    dark: false,
-    icon: "M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z",
-  },
-];
-
-// ─── Sales stats ──────────────────────────────────────────────
-const salesStats = [
-  { label: "Total Barang Terjual", value: "215 Barang" },
-  { label: "Nilai Penjualan Tertinggi", value: "Rp 45.000.000" },
-  { label: "Nilai Rata-rata", value: "Rp 5.800.000" },
-];
+const onlineUsersCount = ref(0);
+let echoChannel = null;
 
 // ─── Chart helpers ────────────────────────────────────────────
-const lineMax = computed(() => Math.max(...userGrowthData.map((d) => d.value)));
-const bidMax = computed(() => Math.max(...bidChartData.map((d) => d.value)));
-const barMax = computed(() =>
-  Math.max(...auctionChartData.map((d) => d.new + d.active + d.ended)),
-);
+const lineMax = computed(() => {
+  if (userGrowthData.value.length === 0) return 1;
+  return Math.max(1, ...userGrowthData.value.map((d) => d.value));
+});
+
+const bidMax = computed(() => {
+  if (bidChartData.value.length === 0) return 1;
+  return Math.max(1, ...bidChartData.value.map((d) => d.value));
+});
+
+const barMax = computed(() => {
+  if (auctionChartData.value.length === 0) return 1;
+  return Math.max(1, ...auctionChartData.value.map((d) => d.new + d.active + d.ended));
+});
 
 function lineY(val, max, h = 80) {
   return h - (val / max) * h;
 }
 
 function polyline(data, max, h = 80, w = 280) {
+  if (!data || data.length < 2) return "0,80 280,80";
   const step = w / (data.length - 1);
   return data.map((d, i) => `${i * step},${lineY(d.value, max, h)}`).join(" ");
 }
 
 function formatRp(val) {
-  return "Rp " + val.toLocaleString("id-ID");
+  if (val === undefined || val === null) return "Rp 0";
+  return "Rp " + Math.round(val).toLocaleString("id-ID");
+}
+
+// ─── API Integration ──────────────────────────────────────────
+async function loadReports() {
+  try {
+    const params = {
+      period: activePeriod.value,
+      date_from: dateFrom.value,
+      date_to: dateTo.value,
+    };
+    const { data } = await getAdminReports(params);
+
+    stats.value = [
+      {
+        label: "Total Pengguna",
+        value: data.stats.total_users,
+        sub: "Seluruh akun terdaftar",
+        dark: false,
+        icon: defaultStatsConfig["Total Pengguna"].icon,
+      },
+      {
+        label: "Pengguna Baru",
+        value: data.stats.new_users,
+        sub: "Periode yang dipilih",
+        dark: false,
+        icon: defaultStatsConfig["Pengguna Baru"].icon,
+      },
+      {
+        label: "Total Lelang",
+        value: data.stats.total_auctions,
+        sub: "Lelang dibuat",
+        dark: true,
+        icon: defaultStatsConfig["Total Lelang"].icon,
+      },
+      {
+        label: "Total Penawaran",
+        value: data.stats.total_bids,
+        sub: "Aktivitas bidding",
+        dark: false,
+        icon: defaultStatsConfig["Total Penawaran"].icon,
+      },
+      {
+        label: "Nilai Transaksi",
+        value: data.stats.transaction_value,
+        sub: "Akumulasi lelang selesai",
+        dark: false,
+        icon: defaultStatsConfig["Nilai Transaksi"].icon,
+      },
+      {
+        label: "Lelang Aktif",
+        value: data.stats.active_auctions,
+        sub: "Sedang berlangsung",
+        dark: false,
+        icon: defaultStatsConfig["Lelang Aktif"].icon,
+      },
+    ];
+
+    realtimeStats.value = [
+      {
+        label: "Pengguna Online",
+        value: String(onlineUsersCount.value > 0 ? onlineUsersCount.value : data.realtime.online_users),
+        icon: defaultRealtimeConfig["Pengguna Online"].icon,
+      },
+      {
+        label: "Viewer Aktif",
+        value: data.realtime.active_viewers,
+        icon: defaultRealtimeConfig["Viewer Aktif"].icon,
+      },
+      {
+        label: "Lelang Berlangsung",
+        value: data.realtime.active_auctions,
+        icon: defaultRealtimeConfig["Lelang Berlangsung"].icon,
+      },
+      {
+        label: "Bid (1 jam)",
+        value: data.realtime.bids_last_hour,
+        icon: defaultRealtimeConfig["Bid (1 jam)"].icon,
+      },
+    ];
+
+    userGrowthData.value = data.charts.userGrowth;
+    bidChartData.value = data.charts.bids;
+    auctionChartData.value = data.charts.auctions;
+
+    categoryStats.value = data.categoryStats;
+    topAuctions.value = data.topAuctions;
+    topUsers.value = data.topUsers;
+
+    salesStats.value = [
+      { label: "Total Barang Terjual", value: data.sales.total_sold },
+      { label: "Nilai Penjualan Tertinggi", value: data.sales.highest_sale },
+      { label: "Nilai Rata-rata", value: data.sales.average_sale },
+    ];
+
+    topItem.value = data.sales.top_item;
+    systemActivity.value = data.systemActivities;
+  } catch (error) {
+    console.error("Gagal memuat laporan:", error);
+  }
 }
 
 // ─── Export ───────────────────────────────────────────────────
-function exportData(format) {
-  console.log(`Export ${format}`);
+async function exportReport(type) {
+  try {
+    const params = {
+      type,
+      period: activePeriod.value,
+      date_from: dateFrom.value,
+      date_to: dateTo.value,
+    };
+    const response = await exportAdminReport(params);
+    const blob = new Blob([response.data], { type: "text/csv;charset=utf-8;" });
+    const url = window.URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    const dateStr = new Date().toISOString().slice(0, 10);
+    link.setAttribute("download", `laporan-${type}-${dateStr}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  } catch (error) {
+    console.error("Gagal mengekspor laporan:", error);
+  }
 }
+
+function exportData(format) {
+  if (format === "pdf") {
+    window.print();
+  } else {
+    exportReport("all");
+  }
+}
+
+// ─── Realtime Presence Channel ────────────────────────────────
+function initEcho() {
+  const echo = getEcho();
+  if (echo) {
+    echoChannel = echo.join("online")
+      .here((users) => {
+        onlineUsersCount.value = users.length;
+        const card = realtimeStats.value.find(rt => rt.label === "Pengguna Online");
+        if (card) card.value = String(users.length);
+      })
+      .joining((user) => {
+        onlineUsersCount.value++;
+        const card = realtimeStats.value.find(rt => rt.label === "Pengguna Online");
+        if (card) card.value = String(onlineUsersCount.value);
+      })
+      .leaving((user) => {
+        onlineUsersCount.value = Math.max(1, onlineUsersCount.value - 1);
+        const card = realtimeStats.value.find(rt => rt.label === "Pengguna Online");
+        if (card) card.value = String(onlineUsersCount.value);
+      });
+  }
+}
+
+// ─── Lifecycle & Watchers ─────────────────────────────────────
+watch(activePeriod, (newVal) => {
+  if (newVal !== "custom") {
+    loadReports();
+  }
+});
+
+onMounted(() => {
+  loadReports();
+  initEcho();
+});
+
+onUnmounted(() => {
+  if (echoChannel) {
+    const echo = getEcho();
+    if (echo) {
+      echo.leave("online");
+    }
+  }
+});
+
+// ─── Donut Pie Calculations ───────────────────────────────────
+const totalAuctionsCount = computed(() => {
+  return categoryStats.value.reduce((sum, cat) => sum + cat.auctions, 0);
+});
+
+const donutSlices = computed(() => {
+  const circumference = 2 * Math.PI * 44; // ~276.46
+  let accumulatedPercent = 0;
+  const colors = ["#111827", "#6b7280", "#d1d5db", "#e5e7eb"];
+
+  return categoryStats.value.slice(0, 4).map((cat, index) => {
+    const pct = cat.pct || 0;
+    const dashArrayVal = (pct / 100) * circumference;
+    const dashArrayOffset = -(accumulatedPercent / 100) * circumference;
+    accumulatedPercent += pct;
+
+    return {
+      name: cat.name,
+      pct: pct,
+      stroke: colors[index] ?? "#f3f4f6",
+      dashArray: `${dashArrayVal.toFixed(1)} ${(circumference - dashArrayVal).toFixed(1)}`,
+      dashOffset: dashArrayOffset.toFixed(1),
+    };
+  });
+});
 </script>
 
 <template>
@@ -231,7 +307,7 @@ function exportData(format) {
           hasil transaksi yang terjadi pada sistem.
         </p>
       </div>
-      <div class="flex gap-2 shrink-0">
+      <div class="flex gap-2 shrink-0 no-print">
         <button
           @click="exportData('excel')"
           class="flex items-center gap-2 px-4 py-2.5 border border-gray-200 text-gray-600 rounded-xl text-sm font-medium hover:border-black hover:text-black transition-all"
@@ -274,7 +350,7 @@ function exportData(format) {
     </div>
 
     <!-- ═══════════════════ PERIOD FILTER ═══════════════════ -->
-    <div class="bg-white rounded-2xl border border-gray-100 p-5">
+    <div class="bg-white rounded-2xl border border-gray-100 p-5 no-print">
       <div class="flex flex-col xl:flex-row gap-4">
         <!-- Period tabs -->
         <div class="flex flex-wrap gap-2">
@@ -314,6 +390,7 @@ function exportData(format) {
             />
           </div>
           <button
+            @click="loadReports"
             class="px-4 py-2 bg-black text-white rounded-xl text-xs font-medium hover:bg-gray-800 transition-colors"
           >
             Terapkan Filter
@@ -426,7 +503,7 @@ function exportData(format) {
             <p class="text-xs text-gray-400 mt-0.5">Registrasi per bulan</p>
           </div>
           <span
-            class="text-xs text-gray-400 font-medium bg-gray-100 px-3 py-1 rounded-lg"
+            class="text-xs text-gray-400 font-medium bg-gray-100 px-3 py-1 rounded-lg no-print"
             >Line Chart</span
           >
         </div>
@@ -494,7 +571,7 @@ function exportData(format) {
             <circle
               v-for="(d, i) in userGrowthData"
               :key="i"
-              :cx="i * (280 / (userGrowthData.length - 1))"
+              :cx="i * (280 / Math.max(1, userGrowthData.length - 1))"
               :cy="lineY(d.value, lineMax)"
               r="3"
               fill="#111827"
@@ -522,7 +599,7 @@ function exportData(format) {
             <p class="text-xs text-gray-400 mt-0.5">Jumlah bid per bulan</p>
           </div>
           <span
-            class="text-xs text-gray-400 font-medium bg-gray-100 px-3 py-1 rounded-lg"
+            class="text-xs text-gray-400 font-medium bg-gray-100 px-3 py-1 rounded-lg no-print"
             >Line Chart</span
           >
         </div>
@@ -586,7 +663,7 @@ function exportData(format) {
             <circle
               v-for="(d, i) in bidChartData"
               :key="i"
-              :cx="i * (280 / (bidChartData.length - 1))"
+              :cx="i * (280 / Math.max(1, bidChartData.length - 1))"
               :cy="lineY(d.value, bidMax)"
               r="3"
               fill="#374151"
@@ -627,7 +704,7 @@ function exportData(format) {
             >Selesai</span
           >
           <span
-            class="text-xs text-gray-400 font-medium bg-gray-100 px-3 py-1 rounded-lg"
+            class="text-xs text-gray-400 font-medium bg-gray-100 px-3 py-1 rounded-lg no-print"
             >Bar Chart</span
           >
         </div>
@@ -670,7 +747,7 @@ function exportData(format) {
             <p class="text-xs text-gray-400 mt-0.5">Performa per kategori</p>
           </div>
           <span
-            class="text-xs text-gray-400 font-medium bg-gray-100 px-3 py-1 rounded-lg"
+            class="text-xs text-gray-400 font-medium bg-gray-100 px-3 py-1 rounded-lg no-print"
             >Pie Chart</span
           >
         </div>
@@ -686,52 +763,17 @@ function exportData(format) {
               stroke="#f3f4f6"
               stroke-width="18"
             />
-            <!-- Lukisan 38% -->
             <circle
+              v-for="(slice, idx) in donutSlices"
+              :key="idx"
               cx="60"
               cy="60"
               r="44"
               fill="none"
-              stroke="#111827"
+              :stroke="slice.stroke"
               stroke-width="18"
-              stroke-dasharray="104.6 172.0"
-              stroke-dashoffset="0"
-              transform="rotate(-90 60 60)"
-            />
-            <!-- Patung 27% -->
-            <circle
-              cx="60"
-              cy="60"
-              r="44"
-              fill="none"
-              stroke="#6b7280"
-              stroke-width="18"
-              stroke-dasharray="74.4 202.2"
-              stroke-dashoffset="-104.6"
-              transform="rotate(-90 60 60)"
-            />
-            <!-- Antik 21% -->
-            <circle
-              cx="60"
-              cy="60"
-              r="44"
-              fill="none"
-              stroke="#d1d5db"
-              stroke-width="18"
-              stroke-dasharray="57.8 218.8"
-              stroke-dashoffset="-179.0"
-              transform="rotate(-90 60 60)"
-            />
-            <!-- Topeng 14% -->
-            <circle
-              cx="60"
-              cy="60"
-              r="44"
-              fill="none"
-              stroke="#e5e7eb"
-              stroke-width="18"
-              stroke-dasharray="38.6 238.0"
-              stroke-dashoffset="-236.8"
+              :stroke-dasharray="slice.dashArray"
+              :stroke-dashoffset="slice.dashOffset"
               transform="rotate(-90 60 60)"
             />
             <text
@@ -743,7 +785,7 @@ function exportData(format) {
               font-weight="700"
               fill="#111827"
             >
-              325
+              {{ totalAuctionsCount }}
             </text>
             <text
               x="60"
@@ -765,9 +807,7 @@ function exportData(format) {
           >
             <span
               class="w-2.5 h-2.5 rounded-full shrink-0"
-              :class="
-                ['bg-gray-800', 'bg-gray-500', 'bg-gray-300', 'bg-gray-200'][i]
-              "
+              :class="colorsClass[i] || 'bg-gray-100'"
             ></span>
             <div class="flex-1 min-w-0">
               <div class="flex justify-between items-center mb-1">
@@ -781,14 +821,7 @@ function exportData(format) {
               <div class="h-1 bg-gray-100 rounded-full">
                 <div
                   class="h-1 rounded-full transition-all duration-700"
-                  :class="
-                    [
-                      'bg-gray-800',
-                      'bg-gray-500',
-                      'bg-gray-300',
-                      'bg-gray-200',
-                    ][i]
-                  "
+                  :class="colorsClass[i] || 'bg-gray-100'"
                   :style="{ width: cat.pct + '%' }"
                 ></div>
               </div>
@@ -950,7 +983,9 @@ function exportData(format) {
           <p class="text-white/50 text-xs uppercase tracking-widest mb-3">
             Statistik Penjualan
           </p>
-          <p class="text-white font-bold text-3xl">215</p>
+          <p class="text-white font-bold text-3xl">
+            {{ salesStats.find(s => s.label === "Total Barang Terjual")?.value.replace(" Barang", "") || "0" }}
+          </p>
           <p class="text-white/40 text-xs mt-1.5">Barang terjual</p>
           <div class="mt-4 pt-4 border-t border-white/10 space-y-3">
             <div v-for="s in salesStats" :key="s.label">
@@ -986,10 +1021,12 @@ function exportData(format) {
               </svg>
             </div>
             <div>
-              <p class="text-xs font-semibold text-black">
-                Patung Garuda Emas Bali
+              <p class="text-xs font-semibold text-black truncate max-w-[180px]">
+                {{ topItem.name }}
               </p>
-              <p class="text-sm font-bold text-black mt-0.5">Rp 45.000.000</p>
+              <p class="text-sm font-bold text-black mt-0.5">
+                {{ formatRp(topItem.price) }}
+              </p>
             </div>
           </div>
         </div>
@@ -1006,7 +1043,7 @@ function exportData(format) {
               Kejadian penting terbaru pada platform
             </p>
           </div>
-          <div class="flex items-center gap-1.5">
+          <div class="flex items-center gap-1.5 no-print">
             <span
               class="live-dot w-1.5 h-1.5 rounded-full bg-black inline-block"
             ></span>
@@ -1053,7 +1090,7 @@ function exportData(format) {
         </div>
 
         <!-- Export options -->
-        <div class="mt-6 pt-5 border-t border-gray-100">
+        <div class="mt-6 pt-5 border-t border-gray-100 no-print">
           <p
             class="text-xs text-gray-400 uppercase tracking-widest font-semibold mb-3"
           >
@@ -1061,17 +1098,12 @@ function exportData(format) {
           </p>
           <div class="flex flex-wrap gap-2">
             <button
-              v-for="label in [
-                'Laporan Pengguna',
-                'Laporan Lelang',
-                'Laporan Penawaran',
-                'Laporan Transaksi',
-                'Laporan Kategori',
-              ]"
-              :key="label"
+              v-for="opt in exportOptions"
+              :key="opt.label"
+              @click="exportReport(opt.type)"
               class="px-3 py-1.5 border border-gray-200 rounded-lg text-xs text-gray-600 hover:border-black hover:text-black transition-all font-medium"
             >
-              {{ label }}
+              {{ opt.label }}
             </button>
           </div>
         </div>
@@ -1108,5 +1140,34 @@ function exportData(format) {
 }
 .live-dot {
   animation: pulseDot 1.4s ease-in-out infinite;
+}
+</style>
+
+<style>
+@media print {
+  /* Hide sidebar, topbar, and elements with no-print class */
+  aside,
+  header,
+  .no-print,
+  button,
+  input,
+  .gap-2,
+  .xl\:ml-auto {
+    display: none !important;
+  }
+  
+  /* Reset left margins and backgrounds for print */
+  .min-h-screen.flex > div,
+  .flex-1 {
+    margin-left: 0 !important;
+    padding-left: 0 !important;
+    padding-right: 0 !important;
+    background-color: white !important;
+  }
+  
+  body, html {
+    background-color: white !important;
+    color: black !important;
+  }
 }
 </style>

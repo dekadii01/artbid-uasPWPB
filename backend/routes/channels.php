@@ -27,3 +27,15 @@ Broadcast::channel('auction.{auctionId}', function ($user, $auctionId) {
 
     return false;
 }, ['guards' => ['sanctum']]);
+
+Broadcast::channel('online', function ($user) {
+    if ($user) {
+        return [
+            'id'   => $user->id,
+            'name' => $user->full_name,
+        ];
+    }
+
+    return false;
+}, ['guards' => ['sanctum']]);
+
