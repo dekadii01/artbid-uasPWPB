@@ -311,7 +311,8 @@ const averageValue = computed(() => {
 const categoryBreakdown = computed(() => {
   const counts = {};
   watchlist.value.forEach((i) => {
-    counts[i.category] = (counts[i.category] ?? 0) + 1;
+    const cat = i.category || "Lainnya";
+    counts[cat] = (counts[cat] ?? 0) + 1;
   });
   const total = watchlist.value.length || 1;
   return Object.keys(counts).map((cat) => ({

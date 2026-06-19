@@ -17,6 +17,10 @@ class Auction extends Model
         'seller_id',
         'title',
         'description',
+        'category_id',
+        'condition',
+        'artist',
+        'year',
         'starting_price',
         'current_price',
         'bid_increment',
@@ -111,6 +115,14 @@ class Auction extends Model
     public function seller(): BelongsTo
     {
         return $this->belongsTo(User::class, 'seller_id');
+    }
+
+    /**
+     * Kategori barang lelang.
+     */
+    public function category(): BelongsTo
+    {
+        return $this->belongsTo(Category::class);
     }
 
     /**

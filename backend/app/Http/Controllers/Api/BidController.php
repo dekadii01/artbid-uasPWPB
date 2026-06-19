@@ -207,7 +207,7 @@ class BidController extends Controller
 
         // Ambil penawaran tertinggi user di setiap lelang
         $bids = Bid::where('bidder_id', $user->id)
-            ->with(['auction.mainImage', 'auction.bids'])
+            ->with(['auction.mainImage', 'auction.category:id,name', 'auction.bids'])
             ->latest()
             ->paginate(12);
 
@@ -248,7 +248,7 @@ class BidController extends Controller
                 'id'          => $auction->id,
                 'name'        => $auction->title,
                 'artist'      => $auction->artist ?? '—',
-                'category'    => $auction->category,
+                'category'    => $auction->category?->name,
                 'image'       => $auction->mainImage?->url ?? null,
                 'myBid'       => (float) $bid->amount,
                 'topBid'      => $topBid ? (float) $topBid->amount : (float) $auction->current_price,

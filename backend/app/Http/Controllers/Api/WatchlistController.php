@@ -19,7 +19,7 @@ class WatchlistController extends Controller
 
         // Load watched auctions with main image and bids count
         $auctions = $user->watchedAuctions()
-            ->with(['mainImage'])
+            ->with(['mainImage', 'category:id,name'])
             ->withCount('bids')
             ->latest()
             ->paginate(12);
@@ -57,7 +57,7 @@ class WatchlistController extends Controller
                 'id'           => $auction->id,
                 'name'         => $auction->title,
                 'artist'       => $auction->artist ?? '—',
-                'category'     => $auction->category,
+                'category'     => $auction->category?->name,
                 'image'        => $mainImageUrl,
                 'currentPrice' => (float) $auction->current_price,
                 'totalBids'    => $auction->bids_count ?? 0,
