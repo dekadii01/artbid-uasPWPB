@@ -33,6 +33,20 @@ export const getMyAuctions = (params = {}) => {
 };
 
 /**
+ * Dashboard data untuk seller yang sedang login.
+ */
+export const getMyAuctionsDashboard = () => {
+  return api.get("/my-auctions/dashboard");
+};
+
+/**
+ * Hapus lelang milik seller (hanya jika scheduled).
+ */
+export const deleteAuction = (id) => {
+  return api.delete(`/auctions/${id}`);
+};
+
+/**
  * Tambah foto ke lelang yang sudah ada.
  *
  * @param {number} auctionId
