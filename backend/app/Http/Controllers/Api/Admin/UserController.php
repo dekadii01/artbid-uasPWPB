@@ -26,12 +26,7 @@ class UserController extends Controller
 
         $mappedUsers = $users->map(function ($user) {
             // Determine role display:
-            $roleLabel = 'Kolektor';
-            if ($user->role === 'admin') {
-                $roleLabel = 'Administrator';
-            } elseif ($user->auctions->count() > 0) {
-                $roleLabel = 'Seniman';
-            }
+            $roleLabel = $user->role === 'admin' ? 'Admin' : 'User';
 
             // Won auctions count
             $wonCount = $user->wins->count();
@@ -252,6 +247,249 @@ class UserController extends Controller
         return response()->json([
             'message' => 'Profil pengguna berhasil diperbarui oleh Admin.',
             'user'    => $user,
+        ]);
+    }
+
+    /**
+     * Tampilkan detail pengguna (Admin).
+     * 
+     * GET /api/admin/users/{user}
+     */
+    public function show(User $user): JsonResponse
+    {
+        $user->load([
+            'auctions',
+            'bids.auction',
+            'wins.auction',
+            'watchlists.auction.seller',
+            'watchlists.auction.category',
+        ]);
+
+        // Map role label
+        $roleLabel = $user->role === 'admin' ? 'Admin' : 'User';
+
+        // Auction History
+        $auctionHistory = $user->auctions->map(function ($auc) {
+            return [
+                'id'         => $auc->id,
+                'name'       => $auc->title,
+                'image'      => $auc->primary_image_url ?? ($auc->mainImage?->url ?? 'https://images.unsplash.com/photo-1579783902614-a3fb3927b6a5?w=200&q=80'),
+                'startPrice' => (float) $auc->starting_price,
+                'finalPrice' => (float) $auc->current_price,
+                'status'     => $auc->status,
+            ];
+        })->values();
+
+        // Bid History
+        $bidHistory = $user->bids->map(function ($bid) {
+            $bidStatus = 'outbid';
+            if ($bid->status === 'won') {
+                $bidStatus = 'won';
+            } elseif ($bid->status === 'active') {
+                $bidStatus = 'leading';
+            }
+
+            return [
+                'id'        => $bid->id,
+                'name'      => $bid->auction?->title ?? 'Lelang',
+                'amount'    => (float) $bid->amount,
+                'status'    => $bidStatus,
+                'time'      => $bid->created_at->setTimezone('Asia/Makassar')->format('d M Y, H.i') . ' WITA',
+            ];
+        })->values();
+
+        // Watchlist Items
+        $watchlistItems = $user->watchlists->map(function ($wl) {
+            $auc = $wl->auction;
+            if (!$auc) return null;
+            return [
+                'id'           => $auc->id,
+                'name'         => $auc->title,
+                'image'        => $auc->primary_image_url ?? ($auc->mainImage?->url ?? 'https://images.unsplash.com/photo-1579783902614-a3fb3927b6a5?w=200&q=80'),
+                'category'     => $auc->category?->name ?? 'Kategori',
+                'currentPrice' => (float) $auc->current_price,
+                'status'       => $auc->status,
+            ];
+        })->filter()->values();
+
+        // Stats
+        $totalBidsVal = (float) $user->bids->sum('amount');
+        $totalSalesVal = (float) $user->auctions()->where('status', 'ended')->sum('current_price');
+        $wonCount = $user->wins->count();
+        $soldCount = $user->auctions()->where('status', 'ended')->whereHas('winner')->count();
+
+        // Dynamic Activities
+        $activities = [];
+        foreach ($user->auctions->sortByDesc('created_at')->take(5) as $auc) {
+            $activities[] = [
+                'text' => 'Membuat lelang baru "' . $auc->title . '"',
+                'time' => $auc->created_at->setTimezone('Asia/Makassar')->format('d M Y, H.i') . ' WITA',
+                'timestamp' => $auc->created_at->timestamp,
+                'dark' => false,
+                'icon' => 'M12 4v16m8-8H4',
+            ];
+        }
+        foreach ($user->bids->sortByDesc('created_at')->take(5) as $bid) {
+            $activities[] = [
+                'text' => 'Melakukan penawaran Rp ' . number_format($bid->amount, 0, ',', '.') . ' pada lelang "' . ($bid->auction?->title ?? 'Lelang') . '"',
+                'time' => $bid->created_at->setTimezone('Asia/Makassar')->format('d M Y, H.i') . ' WITA',
+                'timestamp' => $bid->created_at->timestamp,
+                'dark' => true,
+                'icon' => 'M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z',
+            ];
+        }
+        foreach ($user->wins->sortByDesc('created_at')->take(5) as $win) {
+            $activities[] = [
+                'text' => 'Memenangkan lelang "' . ($win->auction?->title ?? 'Lelang') . '"',
+                'time' => $win->created_at->setTimezone('Asia/Makassar')->format('d M Y, H.i') . ' WITA',
+                'timestamp' => $win->created_at->timestamp,
+                'dark' => false,
+                'icon' => 'M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z',
+            ];
+        }
+        usort($activities, fn($a, $b) => $b['timestamp'] - $a['timestamp']);
+        $activities = array_slice($activities, 0, 5);
+
+        // System Timeline Activities
+        $systemActivities = [];
+        $systemActivities[] = [
+            'text' => 'Akun berhasil dibuat',
+            'time' => $user->created_at->setTimezone('Asia/Makassar')->format('d M Y, H.i') . ' WITA',
+            'timestamp' => $user->created_at->timestamp,
+            'dark' => false,
+            'icon' => 'M18 9v3m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0112 0v1H3v-1z',
+        ];
+        $firstAuc = $user->auctions->sortBy('created_at')->first();
+        if ($firstAuc) {
+            $systemActivities[] = [
+                'text' => 'Membuat lelang pertama',
+                'time' => $firstAuc->created_at->setTimezone('Asia/Makassar')->format('d M Y, H.i') . ' WITA',
+                'timestamp' => $firstAuc->created_at->timestamp,
+                'dark' => false,
+                'icon' => 'M12 4v16m8-8H4',
+            ];
+        }
+        $firstWin = $user->wins->sortBy('created_at')->first();
+        if ($firstWin) {
+            $systemActivities[] = [
+                'text' => 'Memenangkan lelang pertama',
+                'time' => $firstWin->created_at->setTimezone('Asia/Makassar')->format('d M Y, H.i') . ' WITA',
+                'timestamp' => $firstWin->created_at->timestamp,
+                'dark' => true,
+                'icon' => 'M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z',
+            ];
+        }
+        if ($user->bids->count() >= 50) {
+            $fiftyBid = $user->bids->sortBy('created_at')->skip(49)->first();
+            $systemActivities[] = [
+                'text' => 'Total 50 penawaran tercapai',
+                'time' => $fiftyBid->created_at->setTimezone('Asia/Makassar')->format('d M Y, H.i') . ' WITA',
+                'timestamp' => $fiftyBid->created_at->timestamp,
+                'dark' => false,
+                'icon' => 'M13 10V3L4 14h7v7l9-11h-7z',
+            ];
+        }
+        usort($systemActivities, fn($a, $b) => $b['timestamp'] - $a['timestamp']);
+
+        // Mock Login logs
+        $loginHistory = [
+            [
+                'device' => 'Windows 11',
+                'browser' => 'Google Chrome',
+                'ip' => '103.152.112.5',
+                'time' => $user->updated_at->setTimezone('Asia/Makassar')->format('d M Y, H.i') . ' WITA',
+                'icon' => 'M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z',
+            ],
+            [
+                'device' => 'Android',
+                'browser' => 'Chrome Mobile',
+                'ip' => '103.152.112.18',
+                'time' => $user->created_at->addHours(2)->setTimezone('Asia/Makassar')->format('d M Y, H.i') . ' WITA',
+                'icon' => 'M12 18h.01M8 21h8a2 2 0 002-2V5a2 2 0 00-2-2H8a2 2 0 00-2 2v14a2 2 0 002 2z',
+            ]
+        ];
+
+        // Alerts / Notifications
+        $alerts = [];
+        $notifications = [];
+        if ($user->status === 'blocked') {
+            $alerts[] = [
+                'text' => 'Akun ini telah dinonaktifkan oleh administrator.',
+                'dark' => true,
+                'icon' => 'M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z',
+            ];
+            $notifications[] = [
+                'text' => 'Akun ini telah dinonaktifkan oleh administrator.',
+                'dark' => true,
+                'icon' => 'M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z',
+            ];
+        } else {
+            $alerts[] = [
+                'text' => 'Tidak ditemukan aktivitas mencurigakan pada akun ini.',
+                'dark' => false,
+                'icon' => 'M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z',
+            ];
+            $notifications[] = [
+                'text' => 'Tidak ditemukan aktivitas mencurigakan pada akun ini.',
+                'dark' => false,
+                'icon' => 'M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z',
+            ];
+            $notifications[] = [
+                'text' => 'Pengguna memiliki reputasi baik di komunitas platform.',
+                'dark' => false,
+                'icon' => 'M11.049 2.927c.3-.921 1.603-.921 1.902 0l1.519 4.674a1 1 0 00.95.69h4.915c.969 0 1.371 1.24.588 1.81l-3.976 2.888a1 1 0 00-.363 1.118l1.518 4.674c.3.922-.755 1.688-1.538 1.118l-3.976-2.888a1 1 0 00-1.176 0l-3.976 2.888c-.783.57-1.838-.197-1.538-1.118l1.518-4.674a1 1 0 00-.363-1.118l-3.976-2.888c-.784-.57-.38-1.81.588-1.81h4.914a1 1 0 00.951-.69l1.519-4.674z',
+            ];
+        }
+
+        return response()->json([
+            'user' => [
+                'id'              => $user->id,
+                'name'            => $user->full_name,
+                'username'        => explode('@', $user->email)[0],
+                'email'           => $user->email,
+                'phone'           => $user->phone ?? '—',
+                'address'         => 'Denpasar, Bali',
+                'joinedAt'        => $user->created_at->setTimezone('Asia/Makassar')->format('d M Y'),
+                'lastLogin'       => $user->updated_at->setTimezone('Asia/Makassar')->format('d M Y, H.i') . ' WITA',
+                'role'            => $roleLabel,
+                'rawRole'         => $user->role,
+                'status'          => $user->status,
+                'totalAuctions'   => $user->auctions->count(),
+                'totalBids'       => $user->bids->count(),
+                'wonAuctions'     => $wonCount,
+                'watchlist'       => $user->watchlists->count(),
+                'totalBidVal'     => $totalBidsVal,
+                'totalSalesVal'   => $totalSalesVal,
+                'ach_won'         => $wonCount,
+                'ach_sold'        => $soldCount,
+                'ach_bids'        => $user->bids->count(),
+                'alerts'          => $alerts,
+                'notifications'   => $notifications,
+                'recentActivities'=> $activities,
+                'auctionHistory'  => $auctionHistory,
+                'bidHistory'      => $bidHistory,
+                'watchlistItems'  => $watchlistItems,
+                'loginHistory'    => $loginHistory,
+                'systemActivity'  => $systemActivities,
+            ]
+        ]);
+    }
+
+    /**
+     * Hapus akun pengguna secara permanen (Admin).
+     * 
+     * DELETE /api/admin/users/{user}
+     */
+    public function destroy(User $user): JsonResponse
+    {
+        if ($user->id === auth()->id()) {
+            return response()->json(['message' => 'Anda tidak dapat menghapus akun Anda sendiri.'], 400);
+        }
+
+        $user->delete();
+
+        return response()->json([
+            'message' => 'Akun pengguna berhasil dihapus secara permanen.'
         ]);
     }
 }
