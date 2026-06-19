@@ -6,3 +6,39 @@ import api from "./axios";
 export const getAdminDashboard = () => {
   return api.get("/admin/dashboard");
 };
+
+/**
+ * Get admin auctions listing.
+ */
+export const getAdminAuctions = () => {
+  return api.get("/admin/auctions");
+};
+
+/**
+ * Activate a scheduled auction.
+ */
+export const activateAuction = (id) => {
+  return api.patch(`/admin/auctions/${id}/activate`);
+};
+
+/**
+ * Force end an active auction.
+ */
+export const forceEndAuction = (id) => {
+  return api.patch(`/admin/auctions/${id}/end`);
+};
+
+/**
+ * Delete any auction (admin power).
+ */
+export const deleteAdminAuction = (id) => {
+  return api.delete(`/admin/auctions/${id}`);
+};
+
+/**
+ * Get bids list of an auction.
+ */
+export const getAuctionBidsAdmin = (id) => {
+  return api.get(`/auctions/${id}/bids`);
+};
+

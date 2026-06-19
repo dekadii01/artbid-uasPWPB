@@ -1,82 +1,26 @@
 <script setup>
-import { ref, computed } from "vue";
+import { ref, computed, onMounted, onUnmounted } from "vue";
+import { 
+  getAdminAuctions, 
+  activateAuction, 
+  forceEndAuction, 
+  deleteAdminAuction, 
+  getAuctionBidsAdmin 
+} from "../../../api/admin";
+
+// ─── Loading / Error state ───────────────────────────────────
+const isLoading = ref(true);
+const isError = ref(false);
 
 // ─── System alerts ───────────────────────────────────────────
-const systemAlerts = [
-  {
-    text: "Terdapat 2 lelang yang menunggu verifikasi admin.",
-    action: "Verifikasi Sekarang",
-    dark: true,
-    icon: "M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2",
-  },
-  {
-    text: "Terdapat 1 lelang yang dilaporkan pengguna.",
-    action: "Tinjau Laporan",
-    dark: false,
-    icon: "M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z",
-  },
-  {
-    text: "Terdapat 5 lelang yang akan berakhir dalam 1 jam ke depan.",
-    action: "Pantau",
-    dark: false,
-    icon: "M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z",
-  },
-];
+const systemAlerts = ref([]);
 
 // ─── Stats ───────────────────────────────────────────────────
-const stats = [
-  {
-    label: "Total Lelang",
-    value: "325",
-    sub: "Seluruh lelang dibuat",
-    filter: "all",
-    dark: false,
-    icon: "M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2",
-  },
-  {
-    label: "Lelang Aktif",
-    value: "78",
-    sub: "Sedang berlangsung",
-    filter: "active",
-    dark: true,
-    icon: "M13 10V3L4 14h7v7l9-11h-7z",
-  },
-  {
-    label: "Akan Datang",
-    value: "32",
-    sub: "Belum dimulai",
-    filter: "upcoming",
-    dark: false,
-    icon: "M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z",
-  },
-  {
-    label: "Selesai",
-    value: "215",
-    sub: "Pemenang sudah ditentukan",
-    filter: "ended",
-    dark: false,
-    icon: "M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z",
-  },
-];
+const stats = ref([]);
 
 // ─── Filters ─────────────────────────────────────────────────
-const statusFilters = [
-  { label: "Semua", value: "all", count: 325 },
-  { label: "Akan Datang", value: "upcoming", count: 32 },
-  { label: "Sedang Berlangsung", value: "active", count: 78 },
-  { label: "Selesai", value: "ended", count: 215 },
-  { label: "Dibatalkan", value: "cancelled", count: 0 },
-];
-
-const categories = [
-  "Lukisan",
-  "Patung",
-  "Topeng Tradisional",
-  "Ukiran Kayu",
-  "Barang Antik",
-  "Keramik",
-  "Fotografi",
-];
+const statusFilters = ref([]);
+const categories = ref([]);
 
 const activeFilter = ref("all");
 const filterCategory = ref("");
@@ -87,189 +31,7 @@ const currentPage = ref(1);
 const perPage = 8;
 
 // ─── Auctions data ───────────────────────────────────────────
-const auctions = ref([
-  {
-    id: 1,
-    name: "Lukisan Bali Klasik Tahun 1980",
-    seller: "I Made Sudarma",
-    sellerEmail: "sudarma@email.com",
-    sellerAuctions: 8,
-    category: "Lukisan",
-    image:
-      "https://images.unsplash.com/photo-1541701494587-cb58502866ab?w=200&q=80",
-    startPrice: 5000000,
-    currentPrice: 12500000,
-    totalBids: 45,
-    watching: 38,
-    status: "active",
-    startDate: "10 Jun 2026, 09.00",
-    endDate: "12 Jun 2026, 21.00 WITA",
-    description:
-      "Lukisan klasik bergaya Bali tradisional dari seniman terkemuka.",
-  },
-  {
-    id: 2,
-    name: "Patung Garuda Bali",
-    seller: "I Putu Arya",
-    sellerEmail: "arya@email.com",
-    sellerAuctions: 12,
-    category: "Patung",
-    image:
-      "https://images.unsplash.com/photo-1578926288207-32356f3e5e93?w=200&q=80",
-    startPrice: 8000000,
-    currentPrice: 15000000,
-    totalBids: 38,
-    watching: 21,
-    status: "active",
-    startDate: "11 Jun 2026, 10.00",
-    endDate: "13 Jun 2026, 18.00 WITA",
-    description: "Patung Garuda berukir halus dari kayu jati pilihan.",
-  },
-  {
-    id: 3,
-    name: "Topeng Barong Antik",
-    seller: "Ni Luh Eka Sari",
-    sellerEmail: "eka@email.com",
-    sellerAuctions: 5,
-    category: "Topeng Tradisional",
-    image:
-      "https://images.unsplash.com/photo-1567359781514-3b964e2b04d6?w=200&q=80",
-    startPrice: 4000000,
-    currentPrice: 12500000,
-    totalBids: 52,
-    watching: 29,
-    status: "active",
-    startDate: "12 Jun 2026, 08.00",
-    endDate: "14 Jun 2026, 20.00 WITA",
-    description: "Topeng Barong asli dari abad ke-19, kondisi terawat.",
-  },
-  {
-    id: 4,
-    name: "Ukiran Kayu Garuda",
-    seller: "Dewa Gede Artana",
-    sellerEmail: "artana@email.com",
-    sellerAuctions: 3,
-    category: "Ukiran Kayu",
-    image:
-      "https://images.unsplash.com/photo-1460661419201-fd4cecdf8a8b?w=200&q=80",
-    startPrice: 6000000,
-    currentPrice: 18000000,
-    totalBids: 48,
-    watching: 64,
-    status: "active",
-    startDate: "09 Jun 2026, 14.00",
-    endDate: "15 Jun 2026, 16.00 WITA",
-    description: "Ukiran kayu eboni bergambar Garuda, karya maestro Bali.",
-  },
-  {
-    id: 5,
-    name: "Harmoni Semesta",
-    seller: "I Made Wijaya",
-    sellerEmail: "wijaya@email.com",
-    sellerAuctions: 7,
-    category: "Lukisan",
-    image:
-      "https://images.unsplash.com/photo-1513364776144-60967b0f800f?w=200&q=80",
-    startPrice: 7500000,
-    currentPrice: 7500000,
-    totalBids: 0,
-    watching: 14,
-    status: "upcoming",
-    startDate: "18 Jun 2026, 09.00",
-    endDate: "22 Jun 2026, 18.00 WITA",
-    description: "Lukisan abstrak bernuansa alam semesta, teknik acrylic.",
-  },
-  {
-    id: 6,
-    name: "Sunrise Penida",
-    seller: "Agung Rai",
-    sellerEmail: "agung@email.com",
-    sellerAuctions: 15,
-    category: "Fotografi",
-    image:
-      "https://images.unsplash.com/photo-1565193566173-7a0ee3dbe261?w=200&q=80",
-    startPrice: 3000000,
-    currentPrice: 3000000,
-    totalBids: 0,
-    watching: 9,
-    status: "upcoming",
-    startDate: "19 Jun 2026, 08.00",
-    endDate: "21 Jun 2026, 20.00 WITA",
-    description: "Foto sunrise di Nusa Penida, cetak terbatas edisi 1/10.",
-  },
-  {
-    id: 7,
-    name: "Dewi Kesuburan",
-    seller: "Ketut Suardana",
-    sellerEmail: "suardana2@email.com",
-    sellerAuctions: 4,
-    category: "Patung",
-    image:
-      "https://images.unsplash.com/photo-1578301978018-3005759f48f7?w=200&q=80",
-    startPrice: 9000000,
-    currentPrice: 15000000,
-    totalBids: 48,
-    watching: 0,
-    status: "ended",
-    startDate: "1 Jun 2026, 10.00",
-    endDate: "9 Jun 2026, 18.00 WITA",
-    description: "Patung Dewi Kesuburan berbahan batu andesit hitam.",
-  },
-  {
-    id: 8,
-    name: "Alam Tak Terbatas",
-    seller: "Sang Ayu Riani",
-    sellerEmail: "riani@email.com",
-    sellerAuctions: 6,
-    category: "Lukisan",
-    image:
-      "https://images.unsplash.com/photo-1460661419201-fd4cecdf8a8b?w=200&q=80",
-    startPrice: 8500000,
-    currentPrice: 18200000,
-    totalBids: 41,
-    watching: 0,
-    status: "ended",
-    startDate: "28 Mei 2026, 09.00",
-    endDate: "5 Jun 2026, 21.00 WITA",
-    description: "Lukisan batik sutra berlapis emas, motif alam semesta.",
-  },
-  {
-    id: 9,
-    name: "Jejak Digital",
-    seller: "Putu Wiradinata",
-    sellerEmail: "wira@email.com",
-    sellerAuctions: 2,
-    category: "Barang Antik",
-    image:
-      "https://images.unsplash.com/photo-1513364776144-60967b0f800f?w=200&q=80",
-    startPrice: 20000000,
-    currentPrice: 20000000,
-    totalBids: 0,
-    watching: 32,
-    status: "upcoming",
-    startDate: "20 Jun 2026, 10.00",
-    endDate: "25 Jun 2026, 18.00 WITA",
-    description: "Instalasi seni digital interaktif, mixed media.",
-  },
-  {
-    id: 10,
-    name: "Tanah & Api",
-    seller: "Wayan Budarta",
-    sellerEmail: "budarta@email.com",
-    sellerAuctions: 9,
-    category: "Barang Antik",
-    image:
-      "https://images.unsplash.com/photo-1567359781514-3b964e2b04d6?w=200&q=80",
-    startPrice: 4500000,
-    currentPrice: 8750000,
-    totalBids: 29,
-    watching: 18,
-    status: "active",
-    startDate: "13 Jun 2026, 11.00",
-    endDate: "16 Jun 2026, 17.00 WITA",
-    description: "Kendi tanah liat tradisional era 1800-an, kondisi utuh.",
-  },
-]);
+const auctions = ref([]);
 
 // ─── Computed ────────────────────────────────────────────────
 const filteredAuctions = computed(() => {
@@ -288,6 +50,26 @@ const filteredAuctions = computed(() => {
     list = list.filter((a) => a.status === activeFilter.value);
   if (filterCategory.value)
     list = list.filter((a) => a.category === filterCategory.value);
+
+  // Implement period filtering using the startsAt raw date
+  if (filterPeriod.value) {
+    const now = new Date();
+    list = list.filter((a) => {
+      if (!a.startsAt) return false;
+      const start = new Date(a.startsAt);
+      if (filterPeriod.value === "today") {
+        return start.toDateString() === now.toDateString();
+      } else if (filterPeriod.value === "week") {
+        const oneWeekAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+        return start >= oneWeekAgo && start <= now;
+      } else if (filterPeriod.value === "month") {
+        return start.getMonth() === now.getMonth() && start.getFullYear() === now.getFullYear();
+      } else if (filterPeriod.value === "year") {
+        return start.getFullYear() === now.getFullYear();
+      }
+      return true;
+    });
+  }
 
   if (sortBy.value === "price_high")
     list.sort((a, b) => b.currentPrice - a.currentPrice);
@@ -330,18 +112,18 @@ function selectAuction(auction) {
 
 // ─── Bid history modal ───────────────────────────────────────
 const bidHistoryTarget = ref(null);
+const bidHistory = ref([]);
 
-function openBidHistory(auction) {
+async function openBidHistory(auction) {
   bidHistoryTarget.value = auction;
+  bidHistory.value = [];
+  try {
+    const res = await getAuctionBidsAdmin(auction.id);
+    bidHistory.value = res.data;
+  } catch (err) {
+    console.error("Gagal mengambil riwayat penawaran:", err);
+  }
 }
-
-const sampleBidHistory = [
-  { name: "Budi Santoso", amount: 12500000, time: "12 Jun 2026, 19:35 WITA" },
-  { name: "I Putu Gede", amount: 11000000, time: "12 Jun 2026, 18:20 WITA" },
-  { name: "Ni Made Ratna", amount: 9500000, time: "12 Jun 2026, 17:05 WITA" },
-  { name: "Gede Mahendra", amount: 8000000, time: "11 Jun 2026, 22:10 WITA" },
-  { name: "Wayan Sudira", amount: 6500000, time: "11 Jun 2026, 15:45 WITA" },
-];
 
 // ─── Confirm modal ───────────────────────────────────────────
 const confirmTarget = ref(null);
@@ -350,97 +132,98 @@ function confirmAction(action, auction) {
   confirmTarget.value = { action, auction };
 }
 
-function handleConfirm() {
+async function handleConfirm() {
   if (!confirmTarget.value) return;
   const { action, auction } = confirmTarget.value;
-  if (action === "delete") {
-    auctions.value = auctions.value.filter((a) => a.id !== auction.id);
-    if (selectedAuction.value?.id === auction.id) {
-      selectedAuction.value = null;
-      selectedId.value = null;
+  try {
+    if (action === "delete") {
+      await deleteAdminAuction(auction.id);
+    } else if (action === "deactivate") {
+      await forceEndAuction(auction.id);
     }
-  } else if (action === "deactivate") {
-    const target = auctions.value.find((a) => a.id === auction.id);
-    if (target) target.status = "cancelled";
-    if (selectedAuction.value?.id === auction.id)
-      selectedAuction.value = { ...target };
+    await fetchData();
+  } catch (err) {
+    console.error("Gagal melakukan tindakan:", err);
+    alert(err.response?.data?.message || "Gagal memproses permintaan.");
+  } finally {
+    confirmTarget.value = null;
   }
-  confirmTarget.value = null;
 }
 
 // ─── Side panels data ────────────────────────────────────────
-const endingSoon = [
-  {
-    id: 1,
-    name: "Lukisan Bali Klasik",
-    image:
-      "https://images.unsplash.com/photo-1541701494587-cb58502866ab?w=100&q=80",
-    currentPrice: 12500000,
-    totalBids: 45,
-    countdown: "00:25:08",
-  },
-  {
-    id: 3,
-    name: "Topeng Barong Antik",
-    image:
-      "https://images.unsplash.com/photo-1567359781514-3b964e2b04d6?w=100&q=80",
-    currentPrice: 12500000,
-    totalBids: 52,
-    countdown: "00:09:45",
-  },
-  {
-    id: 10,
-    name: "Tanah & Api",
-    image:
-      "https://images.unsplash.com/photo-1567359781514-3b964e2b04d6?w=100&q=80",
-    currentPrice: 8750000,
-    totalBids: 29,
-    countdown: "00:41:20",
-  },
-];
+const endingSoon = ref([]);
+const mostActive = ref([]);
 
-const mostActive = [
-  {
-    id: 3,
-    name: "Topeng Barong Antik",
-    image:
-      "https://images.unsplash.com/photo-1567359781514-3b964e2b04d6?w=100&q=80",
-    totalBids: 52,
-    watching: 29,
-    currentPrice: 12500000,
-  },
-  {
-    id: 4,
-    name: "Ukiran Kayu Garuda",
-    image:
-      "https://images.unsplash.com/photo-1460661419201-fd4cecdf8a8b?w=100&q=80",
-    totalBids: 48,
-    watching: 64,
-    currentPrice: 18000000,
-  },
-  {
-    id: 1,
-    name: "Lukisan Bali Klasik",
-    image:
-      "https://images.unsplash.com/photo-1541701494587-cb58502866ab?w=100&q=80",
-    totalBids: 45,
-    watching: 38,
-    currentPrice: 12500000,
-  },
-  {
-    id: 2,
-    name: "Patung Garuda Bali",
-    image:
-      "https://images.unsplash.com/photo-1578926288207-32356f3e5e93?w=100&q=80",
-    totalBids: 38,
-    watching: 21,
-    currentPrice: 15000000,
-  },
-];
+// Live ticker for ending soon countdowns
+const now = ref(new Date());
+let ticker = null;
+
+function updateCountdowns() {
+  now.value = new Date();
+  if (endingSoon.value) {
+    endingSoon.value.forEach((item) => {
+      if (item.endsAt) {
+        const target = new Date(item.endsAt);
+        const diff = Math.max(0, target - now.value);
+        if (diff <= 0) {
+          item.countdown = "00:00:00";
+        } else {
+          const h = Math.floor(diff / 3600000);
+          const m = Math.floor((diff % 3600000) / 60000);
+          const s = Math.floor((diff % 60000) / 1000);
+          item.countdown = `${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")}`;
+        }
+      }
+    });
+  }
+}
+
+async function fetchData() {
+  isLoading.value = true;
+  isError.value = false;
+  try {
+    const res = await getAdminAuctions();
+    auctions.value = res.data.auctions;
+    categories.value = res.data.categories;
+    stats.value = res.data.stats;
+    statusFilters.value = res.data.statusFilters;
+    systemAlerts.value = res.data.systemAlerts;
+    endingSoon.value = res.data.endingSoon;
+    mostActive.value = res.data.mostActive;
+
+    // Refresh selected auction if it exists
+    if (selectedId.value) {
+      const found = auctions.value.find((a) => a.id === selectedId.value);
+      if (found) {
+        selectedAuction.value = found;
+      } else {
+        selectedAuction.value = null;
+        selectedId.value = null;
+      }
+    }
+
+    updateCountdowns();
+  } catch (err) {
+    console.error("Gagal mengambil data lelang admin:", err);
+    isError.value = true;
+  } finally {
+    isLoading.value = false;
+  }
+}
+
+onMounted(() => {
+  fetchData();
+  ticker = setInterval(updateCountdowns, 1000);
+});
+
+onUnmounted(() => {
+  if (ticker) clearInterval(ticker);
+});
 
 // ─── Helpers ─────────────────────────────────────────────────
 function formatRp(val) {
-  return "Rp " + val.toLocaleString("id-ID");
+  if (val === undefined || val === null) return "Rp 0";
+  return "Rp " + Number(val).toLocaleString("id-ID");
 }
 
 function statusBadge(status) {
@@ -461,12 +244,38 @@ function statusBadge(status) {
       dot: "bg-gray-300",
       label: "Dibatalkan",
     },
+    deleted: {
+      class: "bg-red-50 text-red-600 border border-red-100",
+      dot: "bg-red-600",
+      label: "Dihapus",
+    },
   };
   return map[status] ?? map.ended;
 }
 
 function exportData() {
-  console.log("Export data lelang");
+  const headers = ["ID", "Nama Barang", "Penjual", "Kategori", "Harga Awal", "Harga Sekarang", "Total Bid", "Status", "Waktu Mulai", "Waktu Berakhir"];
+  const rows = auctions.value.map(a => [
+    a.id,
+    `"${a.name.replace(/"/g, '""')}"`,
+    `"${a.seller.replace(/"/g, '""')}"`,
+    `"${a.category.replace(/"/g, '""')}"`,
+    a.startPrice,
+    a.currentPrice,
+    a.totalBids,
+    a.status,
+    a.startDate,
+    a.endDate
+  ]);
+  const csvContent = "data:text/csv;charset=utf-8," 
+    + [headers.join(","), ...rows.map(e => e.join(","))].join("\n");
+  const encodedUri = encodeURI(csvContent);
+  const link = document.createElement("a");
+  link.setAttribute("href", encodedUri);
+  link.setAttribute("download", `data-lelang-${new Date().toISOString().slice(0,10)}.csv`);
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
 }
 </script>
 
@@ -729,9 +538,28 @@ function exportData() {
               </button>
             </div>
 
-            <!-- Empty -->
-            <div
-              v-if="paginatedAuctions.length === 0"
+            <!-- Loading state -->
+            <div v-if="isLoading" class="flex flex-col items-center justify-center py-20">
+              <div class="w-8 h-8 border-2 border-black border-t-transparent rounded-full animate-spin mb-4"></div>
+              <p class="text-xs text-gray-500 font-medium">Memuat data lelang...</p>
+            </div>
+
+            <!-- Error state -->
+            <div v-else-if="isError" class="py-20 text-center">
+              <svg class="w-12 h-12 text-gray-400 mx-auto mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/>
+              </svg>
+              <p class="font-medium text-gray-700 text-sm mb-1">Gagal memuat data lelang</p>
+              <p class="text-gray-400 text-xs mb-4">Terjadi kesalahan pada server.</p>
+              <button @click="fetchData" class="px-4 py-2 bg-black text-white rounded-lg text-xs font-medium hover:bg-gray-800 transition-colors">
+                Coba Lagi
+              </button>
+            </div>
+
+            <template v-else>
+              <!-- Empty -->
+              <div
+                v-if="paginatedAuctions.length === 0"
               class="py-20 text-center"
             >
               <div
@@ -950,6 +778,7 @@ function exportData() {
                           </svg>
                         </button>
                         <button
+                          v-if="auction.status !== 'deleted'"
                           @click="confirmAction('delete', auction)"
                           class="w-7 h-7 flex items-center justify-center rounded-lg border border-gray-200 text-gray-400 hover:border-gray-400 hover:text-gray-700 transition-all"
                           title="Hapus"
@@ -1016,6 +845,7 @@ function exportData() {
                 </button>
               </div>
             </div>
+            </template>
           </div>
         </div>
 
@@ -1343,7 +1173,7 @@ function exportData() {
           </div>
           <div class="divide-y divide-gray-50 max-h-96 overflow-y-auto">
             <div
-              v-for="(bid, i) in sampleBidHistory"
+              v-for="(bid, i) in bidHistory"
               :key="i"
               class="flex items-center justify-between px-6 py-3.5"
             >
