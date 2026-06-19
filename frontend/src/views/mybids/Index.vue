@@ -1,175 +1,65 @@
 <script setup>
-import { ref, computed } from "vue";
+import { ref, computed, onMounted, onUnmounted } from "vue";
 import { Icon } from "@iconify/vue";
+import { getMyBids, getMyBidsDashboard } from "../../api/bids";
 
-// ─── Stats ───────────────────────────────────────────────────
-const stats = [
-  {
-    label: "Lelang Diikuti",
-    value: "18",
-    icon: "lucide:scroll-text",
-    dark: false,
-  },
-  {
-    label: "Sedang Memimpin",
-    value: "5",
-    icon: "lucide:badge-dollar-sign",
-    dark: true,
-  },
-  {
-    label: "Outbid",
-    value: "7",
-    icon: "lucide:trending-down",
-    dark: false,
-  },
-  {
-    label: "Lelang Dimenangkan",
-    value: "6",
-    icon: "lucide:trophy",
-    dark: false,
-  },
-];
-// ─── Ending soon ─────────────────────────────────────────────
-const endingSoon = ref([
-  {
-    id: 3,
-    name: "Patung Dewi Saraswati",
-    image:
-      "https://images.unsplash.com/photo-1578926288207-32356f3e5e93?w=200&q=80",
-    status: "leading",
-    countdown: "00:18:44",
-  },
-  {
-    id: 4,
-    name: "Topeng Tradisional Bali",
-    image:
-      "https://images.unsplash.com/photo-1567359781514-3b964e2b04d6?w=200&q=80",
-    status: "outbid",
-    countdown: "00:09:22",
-  },
-  {
-    id: 5,
-    name: "Ukiran Kayu Barong",
-    image:
-      "https://images.unsplash.com/photo-1513364776144-60967b0f800f?w=200&q=80",
-    status: "leading",
-    countdown: "00:31:05",
-  },
-]);
+// ─── State ────────────────────────────────────────────────────
+const allBids = ref([]);
+const dashboardData = ref({
+  stats: { total: 0, leading: 0, outbid: 0, won: 0, lost: 0, active: 0, ended: 0 },
+  endingSoon: [],
+  activities: [],
+  totalSpentActive: 0,
+  activeBidsCount: 0
+});
 
-// ─── Filters ─────────────────────────────────────────────────
-const filters = [
-  { label: "Semua", value: "all", count: 18 },
-  { label: "Memimpin", value: "leading", count: 5 },
-  { label: "Outbid", value: "outbid", count: 7 },
-  { label: "Menang", value: "won", count: 6 },
-  { label: "Kalah", value: "lost", count: 0 },
-  { label: "Berlangsung", value: "active" },
-  { label: "Selesai", value: "ended" },
-];
+const isLoading = ref(true);
+const isError = ref(false);
 
 const activeFilter = ref("all");
 const search = ref("");
 const sortBy = ref("newest");
 
-// ─── Bid data ────────────────────────────────────────────────
-const allBids = ref([
+// ─── Stats computed ───────────────────────────────────────────
+const stats = computed(() => [
   {
-    id: 1,
-    name: "Lukisan Bali Klasik Tahun 1980",
-    artist: "I Wayan Sukerta",
-    category: "Lukisan",
-    image:
-      "https://images.unsplash.com/photo-1541701494587-cb58502866ab?w=600&q=80",
-    myBid: 5500000,
-    topBid: 5800000,
-    totalBids: 35,
-    lastBidTime: "12 Jun 2026 • 19:35 WITA",
-    status: "outbid",
-    isActive: true,
-    timeLeft: { d: "01", h: "05", m: "12" },
-    endDate: "",
+    label: "Lelang Diikuti",
+    value: String(dashboardData.value.stats?.total ?? 0),
+    icon: "lucide:scroll-text",
+    dark: false,
   },
   {
-    id: 2,
-    name: "Patung Garuda Bali",
-    artist: "Ketut Suardana",
-    category: "Patung",
-    image:
-      "https://images.unsplash.com/photo-1578926288207-32356f3e5e93?w=600&q=80",
-    myBid: 12000000,
-    topBid: 12000000,
-    totalBids: 22,
-    lastBidTime: "14 Jun 2026 • 10:10 WITA",
-    status: "leading",
-    isActive: true,
-    timeLeft: { d: "00", h: "18", m: "44" },
-    endDate: "",
+    label: "Sedang Memimpin",
+    value: String(dashboardData.value.stats?.leading ?? 0),
+    icon: "lucide:badge-dollar-sign",
+    dark: true,
   },
   {
-    id: 3,
-    name: "Topeng Barong Antik",
-    artist: "Ni Luh Eka Sari",
-    category: "Kerajinan",
-    image:
-      "https://images.unsplash.com/photo-1567359781514-3b964e2b04d6?w=600&q=80",
-    myBid: 8750000,
-    topBid: 8750000,
-    totalBids: 18,
-    lastBidTime: "13 Jun 2026 • 21:00 WITA",
-    status: "won",
-    isActive: false,
-    timeLeft: null,
-    endDate: "13 Juni 2026",
+    label: "Outbid",
+    value: String(dashboardData.value.stats?.outbid ?? 0),
+    icon: "lucide:trending-down",
+    dark: false,
   },
   {
-    id: 4,
-    name: "Harmoni Semesta",
-    artist: "I Made Wijaya",
-    category: "Lukisan",
-    image:
-      "https://images.unsplash.com/photo-1460661419201-fd4cecdf8a8b?w=600&q=80",
-    myBid: 9500000,
-    topBid: 11000000,
-    totalBids: 41,
-    lastBidTime: "10 Jun 2026 • 14:20 WITA",
-    status: "leading",
-    isActive: true,
-    timeLeft: { d: "02", h: "03", m: "58" },
-    endDate: "",
+    label: "Lelang Dimenangkan",
+    value: String(dashboardData.value.stats?.won ?? 0),
+    icon: "lucide:trophy",
+    dark: false,
   },
-  {
-    id: 5,
-    name: "Alam Tak Terbatas",
-    artist: "Sang Ayu Putu Riani",
-    category: "Lukisan Batik",
-    image:
-      "https://images.unsplash.com/photo-1513364776144-60967b0f800f?w=600&q=80",
-    myBid: 15000000,
-    topBid: 19200000,
-    totalBids: 29,
-    lastBidTime: "11 Jun 2026 • 09:45 WITA",
-    status: "outbid",
-    isActive: true,
-    timeLeft: { d: "00", h: "01", m: "30" },
-    endDate: "",
-  },
-  {
-    id: 6,
-    name: "Sunrise Penida",
-    artist: "Agung Rai Photography",
-    category: "Fotografi",
-    image:
-      "https://images.unsplash.com/photo-1565193566173-7a0ee3dbe261?w=600&q=80",
-    myBid: 5000000,
-    topBid: 5000000,
-    totalBids: 14,
-    lastBidTime: "09 Jun 2026 • 17:00 WITA",
-    status: "won",
-    isActive: false,
-    timeLeft: null,
-    endDate: "09 Juni 2026",
-  },
+]);
+
+// ─── Ending Soon ──────────────────────────────────────────────
+const endingSoon = computed(() => dashboardData.value.endingSoon ?? []);
+
+// ─── Filters ──────────────────────────────────────────────────
+const filters = computed(() => [
+  { label: "Semua", value: "all", count: allBids.value.length },
+  { label: "Memimpin", value: "leading", count: allBids.value.filter((b) => b.status === "leading").length },
+  { label: "Outbid", value: "outbid", count: allBids.value.filter((b) => b.status === "outbid").length },
+  { label: "Menang", value: "won", count: allBids.value.filter((b) => b.status === "won").length },
+  { label: "Kalah", value: "lost", count: allBids.value.filter((b) => b.status === "lost").length },
+  { label: "Berlangsung", value: "active" },
+  { label: "Selesai", value: "ended" },
 ]);
 
 // ─── Computed filtered list ───────────────────────────────────
@@ -180,71 +70,135 @@ const filteredBids = computed(() => {
     const q = search.value.toLowerCase();
     list = list.filter(
       (b) =>
-        b.name.toLowerCase().includes(q) || b.artist.toLowerCase().includes(q),
+        (b.name && b.name.toLowerCase().includes(q)) ||
+        (b.artist && b.artist.toLowerCase().includes(q))
     );
   }
 
   if (activeFilter.value !== "all") {
     if (activeFilter.value === "active") list = list.filter((b) => b.isActive);
-    else if (activeFilter.value === "ended")
-      list = list.filter((b) => !b.isActive);
+    else if (activeFilter.value === "ended") list = list.filter((b) => !b.isActive);
     else list = list.filter((b) => b.status === activeFilter.value);
   }
 
-  if (sortBy.value === "price_high") list.sort((a, b) => b.topBid - a.topBid);
-  else if (sortBy.value === "price_low")
-    list.sort((a, b) => a.topBid - b.topBid);
-  else if (sortBy.value === "ending")
-    list.sort((a, b) => (a.isActive ? -1 : 1) - (b.isActive ? -1 : 1));
+  if (sortBy.value === "price_high") {
+    list.sort((a, b) => (b.topBid ?? 0) - (a.topBid ?? 0));
+  } else if (sortBy.value === "price_low") {
+    list.sort((a, b) => (a.topBid ?? 0) - (b.topBid ?? 0));
+  } else if (sortBy.value === "ending") {
+    list.sort((a, b) => {
+      if (a.isActive && !b.isActive) return -1;
+      if (!a.isActive && b.isActive) return 1;
+      if (a.isActive && b.isActive) {
+        const dateA = a.endsAt ? new Date(a.endsAt) : new Date(8640000000000000);
+        const dateB = b.endsAt ? new Date(b.endsAt) : new Date(8640000000000000);
+        return dateA - dateB;
+      }
+      return 0;
+    });
+  }
 
   return list;
 });
 
-// ─── Activity feed ───────────────────────────────────────────
-const activities = [
-  {
-    type: "bid",
-    text: 'Anda menawar <strong class="text-black">Rp 5.500.000</strong> pada <strong class="text-black">"Lukisan Bali Klasik Tahun 1980"</strong>',
-    time: "15 menit yang lalu",
-  },
-  {
-    type: "outbid",
-    text: 'Penawaran Anda pada <strong class="text-black">"Patung Garuda Bali"</strong> dikalahkan oleh penawar lain',
-    time: "1 jam yang lalu",
-  },
-  {
-    type: "won",
-    text: 'Anda memenangkan lelang <strong class="text-black">"Topeng Barong Antik"</strong>',
-    time: "1 hari yang lalu",
-  },
-  {
-    type: "bid",
-    text: 'Anda menawar <strong class="text-black">Rp 9.500.000</strong> pada <strong class="text-black">"Harmoni Semesta"</strong>',
-    time: "2 hari yang lalu",
-  },
-  {
-    type: "outbid",
-    text: 'Penawaran Anda pada <strong class="text-black">"Alam Tak Terbatas"</strong> dikalahkan oleh penawar lain',
-    time: "3 hari yang lalu",
-  },
-  {
-    type: "won",
-    text: 'Anda memenangkan lelang <strong class="text-black">"Sunrise Penida"</strong>',
-    time: "5 hari yang lalu",
-  },
-];
+// ─── Activity feed ────────────────────────────────────────────
+const activities = computed(() => dashboardData.value.activities ?? []);
 
-// ─── Quick summary ────────────────────────────────────────────
-const quickSummary = [
-  { label: "Aktif berlangsung", value: "12 lelang", dot: "bg-gray-800" },
-  { label: "Sudah selesai", value: "6 lelang", dot: "bg-gray-300" },
-  { label: "Perlu perhatian", value: "7 outbid", dot: "bg-gray-400" },
-  { label: "Total menang", value: "6 lelang", dot: "bg-black" },
-];
+// ─── Quick summary ─────────────────────────────────────────────
+const quickSummary = computed(() => [
+  { label: "Aktif berlangsung", value: `${dashboardData.value.stats?.active ?? 0} lelang`, dot: "bg-gray-800" },
+  { label: "Sudah selesai", value: `${dashboardData.value.stats?.ended ?? 0} lelang`, dot: "bg-gray-300" },
+  { label: "Perlu perhatian", value: `${dashboardData.value.stats?.outbid ?? 0} outbid`, dot: "bg-gray-400" },
+  { label: "Total menang", value: `${dashboardData.value.stats?.won ?? 0} lelang`, dot: "bg-black" },
+]);
+
+// ─── Budget calculation ───────────────────────────────────────
+const spentPercent = computed(() => {
+  const total = dashboardData.value.totalSpentActive ?? 0;
+  const budget = 100000000; // default budget limit Rp 100.000.000
+  return Math.min(100, Math.round((total / budget) * 100));
+});
+
+// ─── Ticker for Live Countdown ───────────────────────────────
+const now = ref(new Date());
+let ticker = null;
+
+function updateCountdowns() {
+  now.value = new Date();
+  
+  // 1. Tick endingSoon countdowns
+  if (dashboardData.value.endingSoon) {
+    dashboardData.value.endingSoon.forEach((item) => {
+      if (item.endsAt) {
+        const target = new Date(item.endsAt);
+        const diff = Math.max(0, target - now.value);
+        if (diff <= 0) {
+          item.countdown = "00:00:00";
+        } else {
+          const h = Math.floor(diff / 3600000);
+          const m = Math.floor((diff % 3600000) / 60000);
+          const s = Math.floor((diff % 60000) / 1000);
+          item.countdown = `${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")}`;
+        }
+      }
+    });
+  }
+
+  // 2. Tick main bids list timeLeft
+  allBids.value.forEach((bid) => {
+    if (bid.isActive && bid.endsAt) {
+      const target = new Date(bid.endsAt);
+      const diff = Math.max(0, target - now.value);
+      if (diff <= 0) {
+        bid.isActive = false;
+        bid.timeLeft = null;
+        bid.status = bid.status === "leading" ? "won" : "lost";
+      } else {
+        const d = Math.floor(diff / 86400000);
+        const h = Math.floor((diff % 86400000) / 3600000);
+        const m = Math.floor((diff % 3600000) / 60000);
+        bid.timeLeft = {
+          d: String(d).padStart(2, "0"),
+          h: String(h).padStart(2, "0"),
+          m: String(m).padStart(2, "0"),
+        };
+      }
+    }
+  });
+}
+
+async function fetchData(isSilent = false) {
+  if (!isSilent) isLoading.value = true;
+  isError.value = false;
+  try {
+    const dashRes = await getMyBidsDashboard();
+    dashboardData.value = dashRes.data;
+
+    const bidsRes = await getMyBids({ per_page: 100 });
+    allBids.value = bidsRes.data.data ?? [];
+    
+    updateCountdowns();
+  } catch (err) {
+    console.error("Gagal mengambil data penawaran:", err);
+    isError.value = true;
+  } finally {
+    isLoading.value = false;
+  }
+}
+
+onMounted(() => {
+  fetchData();
+  ticker = setInterval(updateCountdowns, 1000);
+});
+
+onUnmounted(() => {
+  if (ticker) clearInterval(ticker);
+});
 
 // ─── Helpers ─────────────────────────────────────────────────
 function formatRp(val) {
-  return "Rp " + val.toLocaleString("id-ID");
+  if (val === undefined || val === null) return "Rp 0";
+  return "Rp " + Number(val).toLocaleString("id-ID");
 }
 
 function statusStyle(status) {
@@ -296,7 +250,27 @@ function activityStyle(type) {
 </script>
 
 <template>
-  <div class="min-h-screen bg-gray-50 font-sans pt-20">
+  <!-- Loading state -->
+  <div v-if="isLoading" class="min-h-screen bg-gray-50 flex items-center justify-center pt-20">
+    <div class="flex flex-col items-center">
+      <div class="w-8 h-8 border-2 border-black border-t-transparent rounded-full animate-spin mb-4"></div>
+      <p class="text-sm text-gray-500 font-medium">Memuat data...</p>
+    </div>
+  </div>
+
+  <!-- Error state -->
+  <div v-else-if="isError" class="min-h-screen bg-gray-50 flex items-center justify-center pt-20">
+    <div class="text-center">
+      <Icon icon="lucide:alert-circle" class="w-12 h-12 text-gray-400 mx-auto mb-4" />
+      <p class="text-lg font-semibold text-gray-800 mb-2">Terjadi Kesalahan</p>
+      <p class="text-sm text-gray-500 mb-6">Gagal memuat data penawaran Anda.</p>
+      <button @click="fetchData(false)" class="px-6 py-2.5 bg-black text-white rounded-lg text-sm font-medium hover:bg-gray-800 transition-colors">
+        Coba Lagi
+      </button>
+    </div>
+  </div>
+
+  <div v-else class="min-h-screen bg-gray-50 font-sans pt-20">
     <div class="mx-auto px-6 md:px-10 py-10">
       <!-- ═══════════════════ HEADER ═══════════════════ -->
       <div class="mb-10">
@@ -408,6 +382,7 @@ function activityStyle(type) {
                     ? 'border border-gray-200 text-gray-600 hover:border-black hover:text-black'
                     : 'bg-black text-white hover:bg-gray-800'
                 "
+                @click="$router.push('/auction/' + item.id)"
               >
                 {{ item.status === "leading" ? "Lihat Detail" : "Tawar Lagi" }}
               </button>
@@ -692,14 +667,14 @@ function activityStyle(type) {
                     <div class="flex gap-2">
                       <button
                         class="px-4 py-2 border border-gray-200 text-gray-600 rounded-lg text-xs font-medium hover:border-black hover:text-black transition-all duration-300"
-                        @click="$router.push(`/auctions/${bid.id}`)"
+                        @click="$router.push(`/auction/${bid.id}`)"
                       >
                         Lihat Detail
                       </button>
                       <button
                         v-if="bid.status === 'outbid'"
                         class="px-4 py-2 bg-black text-white rounded-lg text-xs font-medium hover:bg-gray-800 transition-all duration-300"
-                        @click="$router.push(`/auctions/${bid.id}`)"
+                        @click="$router.push(`/auction/${bid.id}`)"
                       >
                         Tawar Lagi
                       </button>
@@ -789,19 +764,19 @@ function activityStyle(type) {
             <p class="text-white/50 text-xs uppercase tracking-widest mb-3">
               Total Pengeluaran Aktif
             </p>
-            <p class="text-white font-bold text-3xl">Rp 43.750.000</p>
+            <p class="text-white font-bold text-3xl">{{ formatRp(dashboardData.totalSpentActive) }}</p>
             <p class="text-white/40 text-xs mt-2">
-              Dari 5 lelang yang sedang dipimpin
+              Dari {{ dashboardData.activeBidsCount }} lelang yang sedang dipimpin
             </p>
             <div class="mt-5 h-1.5 bg-white/10 rounded-full overflow-hidden">
               <div
                 class="h-full bg-white rounded-full"
-                style="width: 72%"
+                :style="{ width: spentPercent + '%' }"
               ></div>
             </div>
             <div class="flex justify-between mt-1.5">
               <span class="text-white/40 text-xs">Anggaran terpakai</span>
-              <span class="text-white/60 text-xs font-medium">72%</span>
+              <span class="text-white/60 text-xs font-medium">{{ spentPercent }}%</span>
             </div>
           </div>
         </div>
