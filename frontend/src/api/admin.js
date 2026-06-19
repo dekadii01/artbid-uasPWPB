@@ -42,3 +42,11 @@ export const getAuctionBidsAdmin = (id) => {
   return api.get(`/auctions/${id}/bids`);
 };
 
+/**
+ * Get single admin auction detail.
+ */
+export const getAdminAuction = (id) => {
+  return api.get(`/admin/auctions/${id}`);
+};
+
+

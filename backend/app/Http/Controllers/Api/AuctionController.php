@@ -270,8 +270,8 @@ class AuctionController extends Controller
      */
     public function update(UpdateAuctionRequest $request, Auction $auction): JsonResponse
     {
-        // Pastikan lelang milik user yang sedang login
-        if ($auction->seller_id !== $request->user()->id) {
+        // Pastikan lelang milik user yang sedang login atau admin
+        if ($auction->seller_id !== $request->user()->id && !$request->user()->isAdmin()) {
             return response()->json(['message' => 'Kamu tidak berhak mengubah lelang ini.'], 403);
         }
 
@@ -410,12 +410,7 @@ class AuctionController extends Controller
             return response()->json(['message' => 'Lelang hanya dapat dihapus sebelum dimulai.'], 422);
         }
 
-        // Hapus file gambar jika ada
-        foreach ($auction->images as $img) {
-            Storage::disk($img->storage_disk)->delete($img->image_path);
-            $img->delete();
-        }
-
+        // Soft delete the auction
         $auction->delete();
 
         return response()->json([

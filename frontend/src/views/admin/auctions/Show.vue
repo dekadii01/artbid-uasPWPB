@@ -1,170 +1,70 @@
 <script setup>
 import { ref, computed, onMounted, onUnmounted } from "vue";
 import { useRoute, useRouter } from "vue-router";
+import {
+  getAdminAuction,
+  activateAuction,
+  forceEndAuction,
+  deleteAdminAuction,
+} from "../../../api/admin";
 
 const route = useRoute();
 const router = useRouter();
 
+const isLoading = ref(true);
+const isError = ref(false);
+
 // ─── Auction Data ─────────────────────────────────────────────
 const auction = ref({
-  id: 1,
-  name: "Lukisan Bali Klasik Tahun 1980",
-  category: "Lukisan",
-  description:
-    "Lukisan tradisional Bali karya seniman lokal yang dibuat pada tahun 1980 dengan kondisi sangat baik dan memiliki nilai sejarah tinggi.",
-  images: [
-    "https://images.unsplash.com/photo-1541701494587-cb58502866ab?w=800&q=80",
-    "https://images.unsplash.com/photo-1513364776144-60967b0f800f?w=800&q=80",
-    "https://images.unsplash.com/photo-1578301978018-3005759f48f7?w=800&q=80",
-    "https://images.unsplash.com/photo-1460661419201-fd4cecdf8a8b?w=800&q=80",
-  ],
-  startPrice: 5000000,
-  currentPrice: 12500000,
-  minIncrement: 100000,
-  totalBids: 45,
-  status: "active",
-  startDate: "12 Jun 2026, 09.00 WITA",
-  endDate: "15 Jun 2026, 21.00 WITA",
-  endTimestamp: new Date("2026-06-15T21:00:00+08:00").getTime(),
+  id: null,
+  name: "",
+  category: "",
+  description: "",
+  images: [],
+  startPrice: 0,
+  currentPrice: 0,
+  minIncrement: 0,
+  totalBids: 0,
+  status: "upcoming",
+  startDate: "",
+  endDate: "",
+  endTimestamp: 0,
   seller: {
-    name: "I Made Sudarma",
-    email: "madesudarma@gmail.com",
-    phone: "0812xxxxxxxx",
-    joinDate: "10 Januari 2026",
+    name: "",
+    email: "",
+    phone: "",
+    joinDate: "",
     status: "active",
-    totalAuctions: 18,
-    completedAuctions: 15,
-    activeAuctions: 3,
-    totalSold: 15,
+    totalAuctions: 0,
+    completedAuctions: 0,
+    activeAuctions: 0,
+    totalSold: 0,
     avatar: null,
   },
   stats: {
-    totalViewers: 32,
-    currentViewers: 12,
-    bidsLastHour: 8,
-    bidsLast24h: 27,
-    lowestBid: 5100000,
-    uniqueBidders: 18,
-    lastActivity:
-      "Penawaran baru sebesar Rp 12.500.000 oleh I Putu Arya pada 14 Juni 2026 pukul 19.25 WITA.",
+    totalViewers: 0,
+    currentViewers: 0,
+    bidsLastHour: 0,
+    bidsLast24h: 0,
+    lowestBid: 0,
+    uniqueBidders: 0,
+    lastActivity: "",
   },
   antiSniping: {
     active: true,
-    lastExtension: "+2 Menit",
-    note: "Lelang diperpanjang secara otomatis karena terdapat penawaran pada 30 detik terakhir sebelum penutupan.",
+    lastExtension: "Tidak ada",
+    note: "",
   },
   buyNow: {
     used: false,
-    price: 20000000,
+    price: 0,
   },
-  notifications: [
-    {
-      type: "warning",
-      text: "Terdapat 2 laporan pengguna terkait lelang ini.",
-    },
-    {
-      type: "info",
-      text: "Lelang sedang dalam proses peninjauan administrator.",
-    },
-  ],
+  notifications: [],
   winner: null,
 });
 
-const bidHistory = ref([
-  {
-    name: "I Putu Arya",
-    email: "arya@email.com",
-    amount: 12500000,
-    status: "highest",
-    time: "14 Jun 2026, 19.25 WITA",
-  },
-  {
-    name: "Ni Luh Ratna",
-    email: "ratna@email.com",
-    amount: 12300000,
-    status: "outbid",
-    time: "14 Jun 2026, 19.20 WITA",
-  },
-  {
-    name: "Kadek Wijaya",
-    email: "wijaya@email.com",
-    amount: 12000000,
-    status: "outbid",
-    time: "14 Jun 2026, 19.10 WITA",
-  },
-  {
-    name: "Budi Santoso",
-    email: "budi@email.com",
-    amount: 11500000,
-    status: "outbid",
-    time: "14 Jun 2026, 18.55 WITA",
-  },
-  {
-    name: "I Gede Putra",
-    email: "putra@email.com",
-    amount: 11000000,
-    status: "outbid",
-    time: "14 Jun 2026, 18.30 WITA",
-  },
-  {
-    name: "Wayan Sudira",
-    email: "sudira@email.com",
-    amount: 10500000,
-    status: "outbid",
-    time: "14 Jun 2026, 17.45 WITA",
-  },
-  {
-    name: "Ni Made Ayu",
-    email: "ayu@email.com",
-    amount: 9500000,
-    status: "outbid",
-    time: "14 Jun 2026, 16.00 WITA",
-  },
-  {
-    name: "Gede Mahendra",
-    email: "mahendra@email.com",
-    amount: 8000000,
-    status: "outbid",
-    time: "13 Jun 2026, 22.10 WITA",
-  },
-  {
-    name: "Komang Sari",
-    email: "sari@email.com",
-    amount: 6500000,
-    status: "outbid",
-    time: "13 Jun 2026, 15.30 WITA",
-  },
-  {
-    name: "Putu Ariasa",
-    email: "ariasa@email.com",
-    amount: 5100000,
-    status: "outbid",
-    time: "12 Jun 2026, 09.15 WITA",
-  },
-]);
-
-const systemActivity = ref([
-  {
-    text: "Lelang dibuat oleh I Made Sudarma",
-    time: "12 Jun 2026, 08.30 WITA",
-    icon: "M12 4v16m8-8H4",
-  },
-  {
-    text: "Penawaran pertama masuk sebesar Rp 5.100.000",
-    time: "12 Jun 2026, 09.15 WITA",
-    icon: "M13 10V3L4 14h7v7l9-11h-7z",
-  },
-  {
-    text: "Lelang diperpanjang otomatis karena Anti-Sniping",
-    time: "15 Jun 2026, 20.59 WITA",
-    icon: "M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z",
-  },
-  {
-    text: "Pemenang berhasil ditentukan",
-    time: "15 Jun 2026, 21.02 WITA",
-    icon: "M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z",
-  },
-]);
+const bidHistory = ref([]);
+const systemActivity = ref([]);
 
 // ─── Gallery ──────────────────────────────────────────────────
 const activeImage = ref(0);
@@ -174,6 +74,7 @@ const countdown = ref({ days: 0, hours: 0, minutes: 0, seconds: 0 });
 let countdownInterval = null;
 
 function updateCountdown() {
+  if (!auction.value || !auction.value.endTimestamp) return;
   const now = Date.now();
   const diff = auction.value.endTimestamp - now;
   if (diff <= 0) {
@@ -188,8 +89,31 @@ function updateCountdown() {
   };
 }
 
+async function fetchAuctionData() {
+  isLoading.value = true;
+  isError.value = false;
+  try {
+    const res = await getAdminAuction(route.params.id);
+    auction.value = res.data.auction;
+    bidHistory.value = res.data.bidHistory;
+    systemActivity.value = res.data.systemActivity;
+    activeImage.value = 0;
+    
+    if (!auction.value.images || auction.value.images.length === 0) {
+      auction.value.images = ["https://images.unsplash.com/photo-1579783902614-a3fb3927b6a5?w=800&q=80"];
+    }
+
+    updateCountdown();
+  } catch (err) {
+    console.error("Gagal mengambil data lelang:", err);
+    isError.value = true;
+  } finally {
+    isLoading.value = false;
+  }
+}
+
 onMounted(() => {
-  updateCountdown();
+  fetchAuctionData();
   countdownInterval = setInterval(updateCountdown, 1000);
 });
 onUnmounted(() => clearInterval(countdownInterval));
@@ -204,15 +128,39 @@ function closeModal() {
   modal.value = null;
 }
 
-function handleModalConfirm() {
-  if (modal.value === "deactivate") auction.value.status = "cancelled";
-  if (modal.value === "cancel") auction.value.status = "cancelled";
-  if (modal.value === "delete") router.push("/admin/auctions");
-  closeModal();
+async function handleModalConfirm() {
+  try {
+    if (modal.value === "deactivate") {
+      await forceEndAuction(auction.value.id);
+      await fetchAuctionData();
+    } else if (modal.value === "cancel") {
+      await forceEndAuction(auction.value.id);
+      await fetchAuctionData();
+    } else if (modal.value === "delete") {
+      await deleteAdminAuction(auction.value.id);
+      router.push("/admin/auctions");
+    }
+  } catch (err) {
+    console.error(err);
+    alert(err.response?.data?.message || "Gagal memproses permintaan.");
+  } finally {
+    closeModal();
+  }
+}
+
+async function handleActivate() {
+  try {
+    await activateAuction(auction.value.id);
+    await fetchAuctionData();
+  } catch (err) {
+    console.error(err);
+    alert(err.response?.data?.message || "Gagal mengaktifkan lelang.");
+  }
 }
 
 // ─── Helpers ──────────────────────────────────────────────────
 function formatRp(val) {
+  if (val === undefined || val === null) return "Rp 0";
   return "Rp " + val.toLocaleString("id-ID");
 }
 
@@ -238,6 +186,11 @@ function statusBadge(status) {
       dot: "bg-gray-300",
       label: "Dibatalkan",
     },
+    deleted: {
+      class: "bg-red-50 text-red-600 border border-red-100",
+      dot: "bg-red-600",
+      label: "Dihapus",
+    },
   };
   return map[status] ?? map.ended;
 }
@@ -253,7 +206,7 @@ function bidStatusLabel(status) {
 }
 
 const priceMultiplier = computed(() => {
-  if (!auction.value.startPrice) return 1;
+  if (!auction.value || !auction.value.startPrice) return 0;
   return (
     (auction.value.currentPrice / auction.value.startPrice - 1) *
     100
@@ -362,6 +315,25 @@ const modalConfig = computed(() => {
         </div>
       </div>
 
+      <!-- Loading state -->
+      <div v-if="isLoading" class="flex flex-col items-center justify-center py-40">
+        <div class="w-8 h-8 border-2 border-black border-t-transparent rounded-full animate-spin mb-4"></div>
+        <p class="text-xs text-gray-500 font-medium">Memuat detail lelang...</p>
+      </div>
+
+      <!-- Error state -->
+      <div v-else-if="isError" class="py-40 text-center">
+        <svg class="w-12 h-12 text-gray-400 mx-auto mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/>
+        </svg>
+        <p class="font-medium text-gray-700 text-sm mb-1">Gagal memuat detail lelang</p>
+        <p class="text-gray-400 text-xs mb-4">Terjadi kesalahan pada server.</p>
+        <button @click="fetchAuctionData" class="px-4 py-2 bg-black text-white rounded-lg text-xs font-medium hover:bg-gray-800 transition-colors">
+          Coba Lagi
+        </button>
+      </div>
+
+      <template v-else>
       <!-- ══ NOTIFICATIONS ══ -->
       <div v-if="auction.notifications.length" class="space-y-2">
         <div
@@ -988,6 +960,7 @@ const modalConfig = computed(() => {
             </p>
             <div class="space-y-2">
               <button
+                @click="$router.push('/auction/edit/' + auction.id)"
                 class="w-full py-2.5 bg-black text-white rounded-xl text-xs font-medium hover:bg-gray-800 transition-colors flex items-center justify-center gap-1.5"
               >
                 <svg
@@ -1026,8 +999,8 @@ const modalConfig = computed(() => {
                 Nonaktifkan Lelang
               </button>
               <button
-                v-if="auction.status === 'cancelled'"
-                @click="auction.status = 'active'"
+                v-if="auction.status === 'upcoming'"
+                @click="handleActivate"
                 class="w-full py-2.5 border border-gray-200 text-gray-600 rounded-xl text-xs font-medium hover:border-black hover:text-black transition-all duration-300 flex items-center justify-center gap-1.5"
               >
                 <svg
@@ -1087,6 +1060,7 @@ const modalConfig = computed(() => {
           </div>
         </div>
       </div>
+      </template>
     </div>
 
     <!-- ══ CONFIRM MODAL ══ -->
