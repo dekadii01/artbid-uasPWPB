@@ -90,3 +90,17 @@ export const getAdminUser = (id) => {
 export const deleteAdminUser = (id) => {
   return api.delete(`/admin/users/${id}`);
 };
+
+/**
+ * Mengambil data seluruh pengaturan platform dari backend (akses khusus admin).
+ */
+export const getAdminSettings = () => {
+  return api.get("/admin/settings");
+};
+
+/**
+ * Menyimpan pembaruan data pengaturan platform ke backend (akses khusus admin).
+ */
+export const updateAdminSettings = (data) => {
+  return api.put("/admin/settings", data);
+};

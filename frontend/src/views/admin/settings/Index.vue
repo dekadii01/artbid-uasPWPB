@@ -1,7 +1,10 @@
 <script setup>
-import { ref } from "vue";
+import { ref, onMounted, onUnmounted } from "vue";
+import { getAdminSettings, updateAdminSettings } from "../../../api/admin";
+import { getEcho } from "../../../api/echo";
 
-// ─── Active tab ───────────────────────────────────────────────
+// ─── Sesi Tab Aktif ───────────────────────────────────────────
+// Menyimpan status tab halaman pengaturan yang sedang aktif, default ke tab "umum"
 const activeTab = ref("umum");
 
 const tabs = [
@@ -38,16 +41,15 @@ const tabs = [
   },
 ];
 
-// ─── General settings ─────────────────────────────────────────
+// ─── State Pengaturan Umum ────────────────────────────────────
 const general = ref({
   platformName: "ArtBid Bali",
-  description:
-    "Platform lelang daring untuk komunitas kolektor barang seni di Bali.",
+  description: "Platform lelang daring untuk komunitas kolektor barang seni di Bali.",
   adminEmail: "admin@artbidbali.com",
   contact: "+62 812 3456 7890",
 });
 
-// ─── Auction settings ─────────────────────────────────────────
+// ─── State Pengaturan Lelang ──────────────────────────────────
 const auction = ref({
   defaultDuration: "7",
   minBidIncrement: 100000,
@@ -68,7 +70,7 @@ const durationOptions = [
   { label: "30 Hari", value: "30" },
 ];
 
-// ─── Realtime settings ────────────────────────────────────────
+// ─── State Pengaturan Realtime ────────────────────────────────
 const realtime = ref({
   serverStatus: "Online",
   activeConnections: 42,
@@ -81,7 +83,7 @@ const realtime = ref({
   ],
 });
 
-// ─── Notification settings ────────────────────────────────────
+// ─── State Pengaturan Notifikasi ──────────────────────────────
 const notifications = ref({
   outbid: true,
   winner: true,
@@ -91,7 +93,7 @@ const notifications = ref({
   methodEmail: true,
 });
 
-// ─── Security settings ────────────────────────────────────────
+// ─── State Pengaturan Keamanan ────────────────────────────────
 const security = ref({
   sessionExpiry: 7,
   maxLoginAttempts: 5,
@@ -120,7 +122,7 @@ const roles = [
   },
 ];
 
-// ─── Storage settings ─────────────────────────────────────────
+// ─── State Pengaturan Penyimpanan ─────────────────────────────
 const storage = ref({
   driver: "local",
   maxFileSize: 5,
@@ -133,45 +135,128 @@ const storageOptions = [
   { label: "Cloudflare R2", value: "r2" },
 ];
 
-// ─── Backup settings ──────────────────────────────────────────
+// ─── State Pengaturan Backup ──────────────────────────────────
 const backup = ref({
   autoBackup: true,
   frequency: "daily",
   lastBackup: "14 Juni 2026, 23.59 WITA",
 });
 
+// Pilihan frekuensi backup berkala
 const freqOptions = [
   { label: "Harian", value: "daily" },
   { label: "Mingguan", value: "weekly" },
   { label: "Bulanan", value: "monthly" },
 ];
 
-// ─── System info ──────────────────────────────────────────────
-const sysInfo = [
+// ─── State Informasi Sistem ───────────────────────────────────
+const sysInfo = ref([
   { label: "Backend", value: "Laravel 12" },
   { label: "Frontend", value: "Vue 3" },
   { label: "Database", value: "MySQL 8" },
   { label: "Realtime Engine", value: "Laravel Reverb" },
   { label: "Versi Aplikasi", value: "v1.0.0" },
   { label: "Status Sistem", value: "Online", highlight: true },
-];
+]);
 
-// ─── Save toast ───────────────────────────────────────────────
 const saved = ref(false);
-function save() {
-  saved.value = true;
-  setTimeout(() => (saved.value = false), 2500);
+let echoChannel = null;
+
+// Fungsi untuk memuat seluruh pengaturan sistem dari API backend
+async function loadSettings() {
+  try {
+    const { data } = await getAdminSettings();
+    const settings = data.settings;
+    
+    // Menimpa nilai state lokal jika data pengaturan bersangkutan ada di response
+    if (settings.umum) general.value = settings.umum;
+    if (settings.lelang) auction.value = settings.lelang;
+    if (settings.realtime) realtime.value = settings.realtime;
+    if (settings.notifikasi) notifications.value = settings.notifikasi;
+    if (settings.keamanan) security.value = settings.keamanan;
+    if (settings.penyimpanan) storage.value = settings.penyimpanan;
+    if (settings.backup) backup.value = settings.backup;
+  } catch (error) {
+    console.error("Gagal memuat pengaturan sistem:", error);
+  }
 }
 
+// Fungsi untuk menyimpan seluruh perubahan pengaturan sistem ke database
+async function save() {
+  try {
+    // Menyusun payload dari gabungan seluruh state pengaturan reaktif
+    const payload = {
+      umum: general.value,
+      lelang: auction.value,
+      realtime: realtime.value,
+      notifikasi: notifications.value,
+      keamanan: security.value,
+      penyimpanan: storage.value,
+      backup: backup.value,
+    };
+    // Mengirim payload pengaturan baru ke backend via PUT request
+    await updateAdminSettings(payload);
+    // Menampilkan notifikasi sukses simpan (toast)
+    saved.value = true;
+    // Menyembunyikan kembali toast sukses simpan setelah 2.5 detik
+    setTimeout(() => (saved.value = false), 2500);
+  } catch (error) {
+    // Menampilkan log error ke console jika gagal menyimpan pengaturan ke server
+    console.error("Gagal menyimpan pengaturan sistem:", error);
+  }
+}
+
+// Menangani penambahan atau penghapusan format file pada pengaturan penyimpanan
 function toggleFormat(fmt) {
+  // Mencari index format file dalam daftar allowedFormats
   const idx = storage.value.allowedFormats.indexOf(fmt);
+  // Jika tidak ditemukan, tambahkan format baru ke array
   if (idx === -1) storage.value.allowedFormats.push(fmt);
+  // Jika sudah ada, hapus format tersebut dari array
   else storage.value.allowedFormats.splice(idx, 1);
 }
 
+// Memformat nilai desimal/angka menjadi format mata uang Rupiah
 function formatRp(val) {
   return "Rp " + Number(val).toLocaleString("id-ID");
 }
+
+// Fungsi inisialisasi Laravel Echo untuk melacak jumlah user online secara realtime
+function initEcho() {
+  const echo = getEcho();
+  if (echo) {
+    echoChannel = echo.join("online")
+      .here((users) => {
+        realtime.value.activeConnections = users.length;
+      })
+      .joining((user) => {
+        realtime.value.activeConnections++;
+      })
+      .leaving((user) => {
+        realtime.value.activeConnections = Math.max(1, realtime.value.activeConnections - 1);
+      });
+  }
+}
+
+// Mengambil data dan menghubungkan Echo saat komponen selesai dimuat (mounted)
+onMounted(() => {
+  // Memuat data pengaturan sistem dari database
+  loadSettings();
+  // Menginisialisasi koneksi realtime Laravel Echo
+  initEcho();
+});
+
+onUnmounted(() => {
+  // Memeriksa apakah channel Echo masih aktif terhubung
+  if (echoChannel) {
+    // Mendapatkan instansi Echo
+    const echo = getEcho();
+    // Jika ada, keluar dari channel 'online' agar tidak membebani server
+    if (echo) {
+      echo.leave("online");
+    }
+  }
+});
 </script>
 
 <template>

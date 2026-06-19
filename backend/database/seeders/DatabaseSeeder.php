@@ -35,6 +35,7 @@ class DatabaseSeeder extends Seeder
 
         DatabaseSeeder::call([
             CategorySeeder::class,
+            SettingSeeder::class,
         ]);
     }
 }
