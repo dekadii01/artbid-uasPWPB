@@ -278,6 +278,11 @@ async function handleRegister() {
 function goToDashboard() {
   router.push({ name: "Auctions" });
 }
+
+// ─── Google OAuth redirect ───────────────────────────────────
+function loginWithGoogle() {
+  window.location.href = `${import.meta.env.VITE_API_URL}/auth/google/redirect`;
+}
 </script>
 
 <template>
@@ -1018,6 +1023,7 @@ function goToDashboard() {
           <div class="grid grid-cols-2 gap-3 fade-up delay-3">
             <button
               type="button"
+              @click="loginWithGoogle"
               class="flex items-center justify-center gap-2 px-4 py-2.5 border border-gray-200 rounded-lg text-sm text-gray-700 hover:bg-gray-50 hover:border-gray-300 transition-all duration-300"
             >
               <svg class="w-4 h-4" viewBox="0 0 24 24">
