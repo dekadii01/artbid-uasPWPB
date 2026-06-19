@@ -205,25 +205,24 @@ class BidController extends Controller
     {
         $user = $request->user();
 
-        // Ambil penawaran tertinggi user di setiap lelang
-        $bids = Bid::where('bidder_id', $user->id)
+        // Ambil penawaran tertinggi user di setiap lelang (kelompokkan berdasarkan auction_id, ambil ID bid terbaru/terbesar)
+        $latestBidIds = Bid::where('bidder_id', $user->id)
+            ->select(DB::raw('MAX(id) as id'))
+            ->groupBy('auction_id')
+            ->pluck('id');
+
+        $bids = Bid::whereIn('id', $latestBidIds)
             ->with(['auction.mainImage', 'auction.category:id,name', 'auction.bids'])
             ->latest()
-            ->paginate(12);
+            ->paginate($request->query('per_page', 12));
 
         // Map data agar siap pakai di frontend
         $bids->getCollection()->transform(function ($bid) {
             $auction = $bid->auction;
             if (!$auction) return null;
 
-            $statusMap = [
-                'scheduled' => 'upcoming',
-                'active'    => 'live',
-                'ended'     => 'ended',
-            ];
-
-            // Cek apakah bid tertinggi pada lelang ini adalah milik user ini
-            $topBid = $auction->bids()->orderByDesc('amount')->first();
+            // Cek apakah bid tertinggi pada lelang ini adalah milik user ini menggunakan collection eager load
+            $topBid = $auction->bids->sortByDesc('amount')->first();
             $isLeading = $topBid && $topBid->bidder_id === $bid->bidder_id;
 
             $status = 'outbid';
@@ -252,12 +251,13 @@ class BidController extends Controller
                 'image'       => $auction->mainImage?->url ?? null,
                 'myBid'       => (float) $bid->amount,
                 'topBid'      => $topBid ? (float) $topBid->amount : (float) $auction->current_price,
-                'totalBids'   => $auction->bids()->count(),
+                'totalBids'   => $auction->bids->count(),
                 'lastBidTime' => $bid->created_at->setTimezone('Asia/Makassar')->format('d M Y • H:i') . ' WITA',
                 'status'      => $status,
                 'isActive'    => $auction->status === 'active',
                 'timeLeft'    => $timeLeft,
                 'endDate'     => $auction->ends_at ? $auction->ends_at->setTimezone('Asia/Makassar')->format('d M Y') : null,
+                'endsAt'      => $auction->ends_at ? $auction->ends_at->toIso8601String() : null,
             ];
         });
 
@@ -266,5 +266,141 @@ class BidController extends Controller
         $bids->setCollection($filteredCollection);
 
         return response()->json($bids);
+    }
+
+    /**
+     * Dashboard data penawaran untuk buyer yang sedang login.
+     */
+    public function dashboard(Request $request): JsonResponse
+    {
+        $user = $request->user();
+
+        // 1. Ambil bid terbaru user untuk setiap lelang
+        $latestBidIds = Bid::where('bidder_id', $user->id)
+            ->select(DB::raw('MAX(id) as id'))
+            ->groupBy('auction_id')
+            ->pluck('id');
+
+        $bidsCollection = Bid::whereIn('id', $latestBidIds)
+            ->with(['auction.mainImage', 'auction.category:id,name', 'auction.bids'])
+            ->get()
+            ->filter(function ($bid) {
+                return $bid->auction !== null;
+            });
+
+        // Map ke calculated list untuk kalkulasi stats
+        $calculatedBids = $bidsCollection->map(function ($bid) {
+            $auction = $bid->auction;
+            $topBid = $auction->bids->sortByDesc('amount')->first();
+            $isLeading = $topBid && $topBid->bidder_id === $bid->bidder_id;
+
+            $status = 'outbid';
+            if ($auction->status === 'ended') {
+                $status = $isLeading ? 'won' : 'lost';
+            } else {
+                $status = $isLeading ? 'leading' : 'outbid';
+            }
+
+            return [
+                'id'          => $auction->id,
+                'name'        => $auction->title,
+                'artist'      => $auction->artist ?? '—',
+                'category'    => $auction->category?->name,
+                'image'       => $auction->mainImage?->url ?? null,
+                'myBid'       => (float) $bid->amount,
+                'topBid'      => $topBid ? (float) $topBid->amount : (float) $auction->current_price,
+                'status'      => $status,
+                'isActive'    => $auction->status === 'active',
+                'ends_at'     => $auction->ends_at,
+            ];
+        });
+
+        // Calculate statistics
+        $total = $calculatedBids->count();
+        $leading = $calculatedBids->where('status', 'leading')->count();
+        $outbid = $calculatedBids->where('status', 'outbid')->count();
+        $won = $calculatedBids->where('status', 'won')->count();
+        $lost = $calculatedBids->where('status', 'lost')->count();
+        $activeCount = $calculatedBids->where('isActive', true)->count();
+        $endedCount = $calculatedBids->where('isActive', false)->count();
+
+        // endingSoon: top 3 active auctions user bid on, sorted by ending soonest
+        $endingSoon = $calculatedBids->where('isActive', true)
+            ->sortBy(function ($item) {
+                return $item['ends_at'] ? $item['ends_at']->timestamp : PHP_INT_MAX;
+            })
+            ->take(3)
+            ->map(function ($item) {
+                // Calculate countdown string
+                $countdown = '00:00:00';
+                if ($item['ends_at']) {
+                    $diff = now()->diff($item['ends_at']);
+                    if (now()->lessThan($item['ends_at'])) {
+                        $hours = ($diff->d * 24) + $diff->h;
+                        $countdown = sprintf('%02d:%02d:%02d', $hours, $diff->i, $diff->s);
+                    }
+                }
+                return [
+                    'id'        => $item['id'],
+                    'name'      => $item['name'],
+                    'image'     => $item['image'],
+                    'status'    => $item['status'],
+                    'countdown' => $countdown,
+                    'endsAt'    => $item['ends_at'] ? $item['ends_at']->toIso8601String() : null,
+                ];
+            })
+            ->values();
+
+        // 2. Recent activities: the 10 latest bids placed by the user
+        $rawBids = Bid::where('bidder_id', $user->id)
+            ->with(['auction'])
+            ->latest()
+            ->limit(10)
+            ->get();
+
+        $activities = $rawBids->map(function ($bid) {
+            $auction = $bid->auction;
+            if (!$auction) return null;
+
+            $type = 'bid';
+            if ($bid->status === 'won') {
+                $type = 'won';
+                $text = 'Anda memenangkan lelang <strong class="text-black">"' . e($auction->title) . '"</strong>';
+            } elseif ($bid->status === 'outbid') {
+                $type = 'outbid';
+                $text = 'Penawaran Anda pada <strong class="text-black">"' . e($auction->title) . '"</strong> dikalahkan oleh penawar lain';
+            } else {
+                $type = 'bid';
+                $text = 'Anda menawar <strong class="text-black">Rp ' . number_format($bid->amount, 0, ',', '.') . '</strong> pada <strong class="text-black">"' . e($auction->title) . '"</strong>';
+            }
+
+            return [
+                'type' => $type,
+                'text' => $text,
+                'time' => $bid->created_at->diffForHumans(),
+            ];
+        })
+        ->filter()
+        ->values();
+
+        // totalSpentActive: sum of highest bids on active auctions where they are currently leading
+        $totalSpentActive = (float) $calculatedBids->where('status', 'leading')->sum('myBid');
+        $activeBidsCount = $leading;
+
+        return response()->json([
+            'stats' => [
+                'total'      => $total,
+                'leading'    => $leading,
+                'outbid'     => $outbid,
+                'won'        => $won,
+                'lost'       => $lost,
+                'active'     => $activeCount,
+                'ended'      => $endedCount,
+            ],
+            'endingSoon'       => $endingSoon,
+            'activities'       => $activities,
+            'totalSpentActive' => $totalSpentActive,
+            'activeBidsCount'  => $activeBidsCount,
+        ]);
     }
 }

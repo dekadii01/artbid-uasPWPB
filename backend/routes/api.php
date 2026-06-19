@@ -90,6 +90,7 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('auctions/{auction}/bids', [BidController::class, 'store']);
 
     // Riwayat bid milik user yang sedang login
+    Route::get('my-bids/dashboard', [BidController::class, 'dashboard']);
     Route::get('my-bids', [BidController::class, 'myBids']);
 
     // ------------------------------------------------------------------
