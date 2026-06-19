@@ -19,6 +19,7 @@ import AdminUsersShowView from "../views/admin/users/Show.vue";
 import AdminReportsView from "../views/admin/reports/Index.vue";
 import AdminSettingsView from "../views/admin/settings/Index.vue";
 import ProfileView from "../views/profile/Index.vue";
+import AuctionEditView from "../views/auction/Edit.vue";
 
 const routes = [
   {
@@ -55,6 +56,12 @@ const routes = [
     path: "/auction/create",
     name: "AuctionCreate",
     component: AuctionCreateView,
+    meta: { layout: "app", requiresAuth: true },
+  },
+  {
+    path: "/auction/edit/:id",
+    name: "AuctionEdit",
+    component: AuctionEditView,
     meta: { layout: "app", requiresAuth: true },
   },
   {

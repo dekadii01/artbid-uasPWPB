@@ -92,3 +92,11 @@ export const toggleWatchlist = (auctionId) => {
 export const getWatchlist = (params = {}) => {
   return api.get("/watchlist", { params });
 };
+
+/**
+ * Update lelang yang sudah ada.
+ */
+export const updateAuction = (id, data) => {
+  return api.put(`/auctions/${id}`, data);
+};
+
