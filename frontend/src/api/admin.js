@@ -78,6 +78,20 @@ export const exportAdminReport = (params) => {
 };
 
 /**
+ * Get admin user details (admin only).
+ */
+export const getAdminUser = (id) => {
+  return api.get(`/admin/users/${id}`);
+};
+
+/**
+ * Delete a user (admin only).
+ */
+export const deleteAdminUser = (id) => {
+  return api.delete(`/admin/users/${id}`);
+};
+
+/**
  * Mengambil data seluruh pengaturan platform dari backend (akses khusus admin).
  */
 export const getAdminSettings = () => {
@@ -90,4 +104,3 @@ export const getAdminSettings = () => {
 export const updateAdminSettings = (data) => {
   return api.put("/admin/settings", data);
 };
-

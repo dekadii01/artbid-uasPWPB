@@ -121,7 +121,9 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::patch('auctions/{auction}/activate', [AdminAuctionController::class, 'activate']);
         Route::delete('auctions/{auction}',         [AdminAuctionController::class, 'destroy']);
         Route::get('users',                         [AdminUserController::class, 'index']);
+        Route::get('users/{user}',                  [AdminUserController::class, 'show']);
         Route::put('users/{user}',                  [AdminUserController::class, 'update']);
+        Route::delete('users/{user}',               [AdminUserController::class, 'destroy']);
 
         // CRUD Kategori (Admin)
         Route::post('categories',                   [CategoryController::class, 'store']);
