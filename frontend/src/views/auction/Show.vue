@@ -385,11 +385,10 @@ async function placeBid() {
 
 // ─── Buy Now ─────────────────────────────────────────────────────
 const isBuyingNow = ref(false);
-async function handleBuyNow() {
+const showBuyNowModal = ref(false);
+
+async function executeBuyNow() {
   if (isBuyingNow.value) return;
-  if (!confirm(`Apakah Anda yakin ingin membeli item ini seharga ${formatRupiah(auction.value.buyNowPrice)} secara langsung?`)) {
-    return;
-  }
   isBuyingNow.value = true;
   try {
     await buyNowApi(auction.value.id);
@@ -398,6 +397,7 @@ async function handleBuyNow() {
       "success",
       "mdi:trophy"
     );
+    showBuyNowModal.value = false;
     await fetchAuction();
   } catch (err) {
     console.error("Gagal buy now:", err);
@@ -1191,31 +1191,10 @@ const relatedAuctions = ref([]);
               pemenang.
             </p>
             <button
-              @click="handleBuyNow"
-              :disabled="isBuyingNow"
-              class="w-full py-3 border-2 border-black text-black rounded-xl text-sm font-semibold hover:bg-black hover:text-white transition-all duration-200 disabled:opacity-50 flex items-center justify-center gap-2"
+              @click="showBuyNowModal = true"
+              class="w-full py-3 border-2 border-black text-black rounded-xl text-sm font-semibold hover:bg-black hover:text-white transition-all duration-200 flex items-center justify-center gap-2"
             >
-              <svg
-                v-if="isBuyingNow"
-                class="w-4 h-4 animate-spin"
-                fill="none"
-                viewBox="0 0 24 24"
-              >
-                <circle
-                  class="opacity-25"
-                  cx="12"
-                  cy="12"
-                  r="10"
-                  stroke="currentColor"
-                  stroke-width="4"
-                />
-                <path
-                  class="opacity-75"
-                  fill="currentColor"
-                  d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"
-                />
-              </svg>
-              {{ isBuyingNow ? "Memproses..." : "Beli Sekarang" }}
+              Beli Sekarang
             </button>
           </div>
 
@@ -1325,6 +1304,94 @@ const relatedAuctions = ref([]);
         </div>
       </div>
     </div>
+    <!-- ── BUY NOW MODAL ─────────────────────────────────────── -->
+    <transition
+      enter-active-class="transition duration-300 ease-out"
+      enter-from-class="opacity-0"
+      enter-to-class="opacity-100"
+      leave-active-class="transition duration-200 ease-in"
+      leave-from-class="opacity-100"
+      leave-to-class="opacity-0"
+    >
+      <div
+        v-if="showBuyNowModal"
+        class="fixed inset-0 bg-black/55 backdrop-blur-sm z-50 flex items-center justify-center p-4"
+        @click.self="showBuyNowModal = false"
+      >
+        <transition
+          enter-active-class="transition duration-300 ease-out"
+          enter-from-class="opacity-0 translate-y-4 scale-95"
+          enter-to-class="opacity-100 translate-y-0 scale-100"
+          leave-active-class="transition duration-200 ease-in"
+          leave-from-class="opacity-100 translate-y-0 scale-100"
+          leave-to-class="opacity-0 translate-y-4 scale-95"
+        >
+          <div class="relative bg-white rounded-2xl p-7 max-w-sm w-full shadow-2xl border border-gray-100">
+            <!-- Header -->
+            <div class="flex items-center gap-3 mb-4">
+              <div>
+                <h3 class="font-bold text-lg text-black">Beli Sekarang</h3>
+                <p class="text-xs text-gray-400">Konfirmasi Pembelian Langsung</p>
+              </div>
+            </div>
+
+            <!-- Content -->
+            <div class="bg-gray-50 rounded-xl p-4 mb-6 space-y-3">
+              <div>
+                <p class="text-[10px] text-gray-400 uppercase tracking-wider font-semibold">Karya Seni</p>
+                <p class="text-sm font-bold text-gray-800 truncate">{{ auction.name }}</p>
+              </div>
+              <div class="border-t border-gray-200/60 pt-2.5">
+                <p class="text-[10px] text-gray-400 uppercase tracking-wider font-semibold">Harga Tetap (Buy Now)</p>
+                <p class="text-lg font-black text-black">{{ formatRupiah(auction.buyNowPrice) }}</p>
+              </div>
+            </div>
+
+            <p class="text-xs text-gray-400 leading-relaxed mb-6">
+              Tindakan ini akan mengakhiri lelang secara langsung dan menetapkan Anda sebagai pemenang secara permanen.
+            </p>
+
+            <!-- Actions -->
+            <div class="flex gap-3">
+              <button
+                @click="showBuyNowModal = false"
+                :disabled="isBuyingNow"
+                class="flex-1 py-2.5 border border-gray-200 text-gray-600 rounded-xl text-sm font-medium hover:bg-gray-50 transition-colors disabled:opacity-50"
+              >
+                Batal
+              </button>
+              <button
+                @click="executeBuyNow"
+                :disabled="isBuyingNow"
+                class="flex-1 py-2.5 bg-black text-white rounded-xl text-sm font-medium hover:bg-gray-800 transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
+              >
+                <svg
+                  v-if="isBuyingNow"
+                  class="w-4 h-4 animate-spin text-white"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                >
+                  <circle
+                    class="opacity-25"
+                    cx="12"
+                    cy="12"
+                    r="10"
+                    stroke="currentColor"
+                    stroke-width="4"
+                  />
+                  <path
+                    class="opacity-75"
+                    fill="currentColor"
+                    d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"
+                  />
+                </svg>
+                Konfirmasi
+              </button>
+            </div>
+          </div>
+        </transition>
+      </div>
+    </transition>
   </div>
 </template>
 
