@@ -76,3 +76,18 @@ export const getAdminReports = (params) => {
 export const exportAdminReport = (params) => {
   return api.get("/admin/reports/export", { params, responseType: "blob" });
 };
+
+/**
+ * Mengambil data seluruh pengaturan platform dari backend (akses khusus admin).
+ */
+export const getAdminSettings = () => {
+  return api.get("/admin/settings");
+};
+
+/**
+ * Menyimpan pembaruan data pengaturan platform ke backend (akses khusus admin).
+ */
+export const updateAdminSettings = (data) => {
+  return api.put("/admin/settings", data);
+};
+

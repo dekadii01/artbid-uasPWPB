@@ -3,6 +3,7 @@
 use App\Http\Controllers\Api\Admin\AuctionController as AdminAuctionController;
 use App\Http\Controllers\Api\Admin\UserController as AdminUserController;
 use App\Http\Controllers\Api\Admin\ReportController;
+use App\Http\Controllers\Api\Admin\SettingController;
 use App\Http\Controllers\Api\AuctionController;
 use App\Http\Controllers\Api\AuctionImageController;
 use App\Http\Controllers\Api\AuctionWinnerController;
@@ -131,5 +132,9 @@ Route::middleware('auth:sanctum')->group(function () {
         // Admin Reports
         Route::get('reports',                       [ReportController::class, 'index']);
         Route::get('reports/export',                [ReportController::class, 'export']);
+
+        // Admin Settings
+        Route::get('settings',                      [SettingController::class, 'index']);
+        Route::put('settings',                      [SettingController::class, 'update']);
     });
 });
