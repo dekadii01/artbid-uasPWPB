@@ -1,12 +1,9 @@
 <script setup>
-import { ref, computed, onMounted, onUnmounted, inject } from "vue";
+import { ref, computed, onMounted, onUnmounted } from "vue";
 import { useRouter } from "vue-router";
+import { getAdminDashboard } from "../../api/admin";
 
 const router = useRouter();
-
-// ─── Sidebar width sync (matches AdminSidebar collapsed state) ─
-// Use a simple approach: expose collapsed via provide/inject or just hardcode widths
-// For now we read from a shared ref — connect to your state management as needed
 
 // ─── Topbar state ────────────────────────────────────────────
 const searchQuery = ref("");
@@ -25,7 +22,23 @@ const adminInitials = computed(() =>
     .toUpperCase(),
 );
 
+onMounted(() => {
+  try {
+    const userStr = localStorage.getItem("artbid_user");
+    if (userStr) {
+      const user = JSON.parse(userStr);
+      if (user.first_name) {
+        adminName.value = `${user.first_name} ${user.last_name || ""}`.trim();
+      }
+    }
+  } catch (e) {
+    console.error("Gagal load profile dari localStorage:", e);
+  }
+});
+
 function handleLogout() {
+  localStorage.removeItem("artbid_token");
+  localStorage.removeItem("artbid_user");
   router.push("/admin/login");
 }
 
@@ -38,257 +51,174 @@ function handleClickOutside(e) {
 onMounted(() => document.addEventListener("click", handleClickOutside));
 onUnmounted(() => document.removeEventListener("click", handleClickOutside));
 
-// ─── System notifications ────────────────────────────────────
-const systemNotifs = [
-  {
-    text: "Terdapat 3 laporan pengguna yang belum ditinjau.",
-    time: "5 menit lalu",
+// ─── Fetch data from API ──────────────────────────────────────
+const isLoading = ref(true);
+const isError = ref(false);
+
+const mainStats = ref([]);
+const auctionStatus = ref([]);
+const topCategories = ref([]);
+const monthlyChart = ref([]);
+const dailyBidsChart = ref([]);
+const systemActivities = ref([]);
+const endingAuctions = ref([]);
+const popularAuctions = ref([]);
+const activeUsers = ref([]);
+const financial = ref({
+  totalTransactions: 0,
+  averageTransaction: 0,
+  commissionPlatform: 0,
+});
+
+// Live ticker for ending soon countdowns
+const now = ref(new Date());
+let ticker = null;
+
+function updateCountdowns() {
+  now.value = new Date();
+  
+  if (endingAuctions.value) {
+    endingAuctions.value.forEach((item) => {
+      if (item.endsAt) {
+        const target = new Date(item.endsAt);
+        const diff = Math.max(0, target - now.value);
+        if (diff <= 0) {
+          item.countdown = "00:00:00";
+        } else {
+          const h = Math.floor(diff / 3600000);
+          const m = Math.floor((diff % 3600000) / 60000);
+          const s = Math.floor((diff % 60000) / 1000);
+          item.countdown = `${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")}`;
+        }
+      }
+    });
+  }
+}
+
+async function fetchData(isSilent = false) {
+  if (!isSilent) isLoading.value = true;
+  isError.value = false;
+  try {
+    const res = await getAdminDashboard();
+    const d = res.data;
+
+    mainStats.value = d.mainStats ?? [];
+    auctionStatus.value = d.auctionStatus ?? [];
+    topCategories.value = d.topCategories ?? [];
+    monthlyChart.value = d.monthlyChart ?? [];
+    dailyBidsChart.value = d.dailyBidsChart ?? [];
+    systemActivities.value = d.systemActivities ?? [];
+    endingAuctions.value = d.endingAuctions ?? [];
+    popularAuctions.value = d.popularAuctions ?? [];
+    activeUsers.value = d.activeUsers ?? [];
+    financial.value = d.financial ?? {
+      totalTransactions: 0,
+      averageTransaction: 0,
+      commissionPlatform: 0,
+    };
+
+    updateCountdowns();
+  } catch (err) {
+    console.error("Gagal mengambil data dashboard admin:", err);
+    isError.value = true;
+  } finally {
+    isLoading.value = false;
+  }
+}
+
+onMounted(() => {
+  fetchData();
+  ticker = setInterval(updateCountdowns, 1000);
+});
+
+onUnmounted(() => {
+  if (ticker) clearInterval(ticker);
+});
+
+// ─── System notifications & alerts ────────────────────────────
+const systemAlerts = computed(() => {
+  const scheduledCount = auctionStatus.value.find((s) => s.label === "Akan Datang" || s.label === "scheduled")?.count ?? 0;
+  const alerts = [];
+  
+  if (scheduledCount > 0) {
+    alerts.push({
+      text: `Terdapat ${scheduledCount} lelang yang menunggu verifikasi admin.`,
+      action: "Verifikasi",
+      dark: true,
+      icon: "M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2",
+      to: "/admin/auctions"
+    });
+  }
+
+  alerts.push({
+    text: "Sistem realtime broadcasting berjalan normal.",
+    action: "Status",
     dark: false,
-    icon: "M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z",
-  },
-  {
-    text: "Terdapat 2 lelang yang menunggu verifikasi.",
-    time: "12 menit lalu",
-    dark: true,
-    icon: "M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2",
-  },
-  {
+    icon: "M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z",
+    to: ""
+  });
+
+  return alerts;
+});
+
+const systemNotifs = computed(() => {
+  const list = [];
+  const scheduledCount = auctionStatus.value.find((s) => s.label === "Akan Datang" || s.label === "scheduled")?.count ?? 0;
+  if (scheduledCount > 0) {
+    list.push({
+      text: `Terdapat ${scheduledCount} lelang menunggu verifikasi.`,
+      time: "Baru saja",
+      dark: true,
+      icon: "M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2",
+    });
+  }
+  list.push({
     text: "Sistem realtime broadcasting berjalan normal.",
     time: "1 jam lalu",
     dark: false,
     icon: "M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z",
-  },
-];
+  });
+  return list;
+});
 
-const systemAlerts = [
-  {
-    text: "Terdapat 3 laporan pengguna yang belum ditinjau.",
-    action: "Tinjau Sekarang",
-    dark: false,
-    icon: "M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z",
-  },
-  {
-    text: "Terdapat 2 lelang yang menunggu verifikasi admin.",
-    action: "Verifikasi",
-    dark: true,
-    icon: "M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2",
-  },
-];
-
-// ─── Main stats ──────────────────────────────────────────────
-const mainStats = [
-  {
-    label: "Total Pengguna",
-    value: "1.245",
-    sub: "+25 pengguna baru bulan ini",
-    badge: "+2%",
-    icon: "M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z",
-    dark: false,
-  },
-  {
-    label: "Total Lelang",
-    value: "325",
-    sub: "Total seluruh lelang dibuat",
-    badge: "All time",
-    icon: "M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2",
-    dark: true,
-  },
-  {
-    label: "Lelang Aktif",
-    value: "78",
-    sub: "Sedang berlangsung saat ini",
-    badge: "Live",
-    icon: "M13 10V3L4 14h7v7l9-11h-7z",
-    dark: false,
-  },
-  {
-    label: "Total Penawaran",
-    value: "4.521",
-    sub: "Seluruh penawaran ke sistem",
-    badge: "+318 hari ini",
-    icon: "M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z",
-    dark: false,
-  },
-];
-
-// ─── Auction status ──────────────────────────────────────────
-const auctionStatus = [
-  { label: "Sedang Berlangsung", count: 78, dot: "bg-black", pct: 72 },
-  { label: "Akan Datang", count: 32, dot: "bg-gray-400", pct: 30 },
-  { label: "Selesai", count: 215, dot: "bg-gray-200", pct: 100 },
-];
-
-// ─── Top categories ──────────────────────────────────────────
-const topCategories = [
-  { name: "Lukisan", emoji: "🖼", count: 92 },
-  { name: "Patung", emoji: "🗿", count: 68 },
-  { name: "Topeng Tradisional", emoji: "🎭", count: 47 },
-  { name: "Ukiran Kayu", emoji: "🪵", count: 38 },
-  { name: "Barang Antik", emoji: "🏺", count: 29 },
-];
-
-// ─── Monthly chart ───────────────────────────────────────────
-const monthlyChart = [
-  { month: "Jan", val: 18, pct: 36, active: false },
-  { month: "Feb", val: 24, pct: 48, active: false },
-  { month: "Mar", val: 31, pct: 62, active: false },
-  { month: "Apr", val: 28, pct: 56, active: false },
-  { month: "Mei", val: 42, pct: 84, active: false },
-  { month: "Jun", val: 50, pct: 100, active: true },
-];
-
-// ─── Daily bids chart ────────────────────────────────────────
-const dailyBidsChart = [
-  { day: "Sen", val: 312, pct: 62, active: false },
-  { day: "Sel", val: 285, pct: 57, active: false },
-  { day: "Rab", val: 498, pct: 100, active: false },
-  { day: "Kam", val: 421, pct: 84, active: false },
-  { day: "Jum", val: 389, pct: 78, active: false },
-  { day: "Sab", val: 446, pct: 89, active: false },
-  { day: "Min", val: 318, pct: 64, active: true },
-];
-
-// ─── Quick actions ───────────────────────────────────────────
+// ─── Quick actions ────────────────────────────────────────────
 const quickActions = [
   {
-    label: "Kelola Lelang",
+    label: "Verifikasi Lelang",
     to: "/admin/auctions",
     dark: true,
-    icon: "M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2",
+    icon: "M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"
   },
   {
     label: "Kelola Pengguna",
     to: "/admin/users",
     dark: false,
-    icon: "M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z",
+    icon: "M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z"
   },
   {
-    label: "Kelola Kategori",
+    label: "Kategori Karya",
     to: "/admin/categories",
     dark: false,
-    icon: "M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z",
+    icon: "M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z"
   },
   {
-    label: "Lihat Laporan",
+    label: "Laporan Keuangan",
     to: "/admin/reports",
     dark: false,
-    icon: "M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z",
-  },
-];
-
-// ─── System activities ───────────────────────────────────────
-const systemActivities = [
-  {
-    type: "user",
-    text: 'Pengguna <strong class="text-black">"I Putu Arya"</strong> membuat lelang baru',
-    time: "2 menit yang lalu",
-  },
-  {
-    type: "bid",
-    text: 'Lelang <strong class="text-black">"Patung Garuda Bali"</strong> menerima penawaran baru sebesar <strong class="text-black">Rp 12.500.000</strong>',
-    time: "5 menit yang lalu",
-  },
-  {
-    type: "user",
-    text: 'Pengguna baru <strong class="text-black">"Ni Made Ayu"</strong> berhasil melakukan registrasi',
-    time: "10 menit yang lalu",
-  },
-  {
-    type: "ended",
-    text: 'Lelang <strong class="text-black">"Topeng Barong Antik"</strong> telah berakhir dan pemenang berhasil ditentukan',
-    time: "15 menit yang lalu",
-  },
-  {
-    type: "bid",
-    text: 'Lelang <strong class="text-black">"Harmoni Semesta"</strong> menerima 5 penawaran baru dalam 10 menit',
-    time: "22 menit yang lalu",
-  },
-  {
-    type: "user",
-    text: 'Pengguna <strong class="text-black">"Ketut Wirawan"</strong> mengirimkan laporan pada lelang #AB-2844',
-    time: "38 menit yang lalu",
-  },
-];
-
-// ─── Ending auctions ─────────────────────────────────────────
-const endingAuctions = [
-  {
-    id: 1,
-    name: "Lukisan Bali Klasik 1980",
-    image:
-      "https://images.unsplash.com/photo-1541701494587-cb58502866ab?w=100&q=80",
-    currentPrice: 8500000,
-    countdown: "00:25:08",
-  },
-  {
-    id: 2,
-    name: "Topeng Barong Antik",
-    image:
-      "https://images.unsplash.com/photo-1567359781514-3b964e2b04d6?w=100&q=80",
-    currentPrice: 12500000,
-    countdown: "00:09:45",
-  },
-  {
-    id: 3,
-    name: "Patung Dewi Saraswati",
-    image:
-      "https://images.unsplash.com/photo-1578926288207-32356f3e5e93?w=100&q=80",
-    currentPrice: 6200000,
-    countdown: "00:41:20",
-  },
-];
-
-// ─── Popular auctions ────────────────────────────────────────
-const popularAuctions = [
-  {
-    id: 1,
-    name: "Topeng Barong Antik",
-    seller: "Ni Luh Eka Sari",
-    bids: 52,
-    viewers: 28,
-    image:
-      "https://images.unsplash.com/photo-1567359781514-3b964e2b04d6?w=100&q=80",
-  },
-  {
-    id: 2,
-    name: "Lukisan Bali Klasik 1980",
-    seller: "I Wayan Sukerta",
-    bids: 35,
-    viewers: 42,
-    image:
-      "https://images.unsplash.com/photo-1541701494587-cb58502866ab?w=100&q=80",
-  },
-  {
-    id: 3,
-    name: "Patung Garuda Bali",
-    seller: "Ketut Suardana",
-    bids: 29,
-    viewers: 19,
-    image:
-      "https://images.unsplash.com/photo-1578926288207-32356f3e5e93?w=100&q=80",
-  },
-  {
-    id: 4,
-    name: "Harmoni Semesta",
-    seller: "I Made Wijaya",
-    bids: 22,
-    viewers: 31,
-    image:
-      "https://images.unsplash.com/photo-1460661419201-fd4cecdf8a8b?w=100&q=80",
-  },
-];
-
-// ─── Active users ────────────────────────────────────────────
-const activeUsers = [
-  { id: 1, name: "Budi Santoso", initials: "BS", bids: 24, auctions: 3 },
-  { id: 2, name: "I Putu Arya", initials: "PA", bids: 18, auctions: 5 },
-  { id: 3, name: "Ni Made Ratna", initials: "MR", bids: 15, auctions: 2 },
-  { id: 4, name: "Gede Mahendra", initials: "GM", bids: 12, auctions: 1 },
+    icon: "M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"
+  }
 ];
 
 // ─── Helpers ─────────────────────────────────────────────────
 function formatRp(val) {
-  return "Rp " + val.toLocaleString("id-ID");
+  if (val === undefined || val === null) return "Rp 0";
+  if (val >= 1000000000) {
+    return "Rp " + (val / 1000000000).toLocaleString("id-ID", { maximumFractionDigits: 1 }) + " M";
+  }
+  if (val >= 1000000) {
+    return "Rp " + (val / 1000000).toLocaleString("id-ID", { maximumFractionDigits: 1 }) + " Jt";
+  }
+  return "Rp " + Number(val).toLocaleString("id-ID");
 }
 
 function actStyle(type) {
@@ -319,8 +249,27 @@ function actStyle(type) {
     <div class="flex-1 flex flex-col min-w-0 transition-all duration-300">
       <!-- ═══════════════════ PAGE CONTENT ═══════════════════ -->
       <main class="flex-1 px-8 py-8 overflow-y-auto">
-        <!-- Header -->
-        <div class="mb-8">
+        <!-- Loading state -->
+        <div v-if="isLoading" class="flex flex-col items-center justify-center py-32">
+          <div class="w-8 h-8 border-2 border-black border-t-transparent rounded-full animate-spin mb-4"></div>
+          <p class="text-sm text-gray-500 font-medium">Memuat data dashboard...</p>
+        </div>
+
+        <!-- Error state -->
+        <div v-else-if="isError" class="text-center py-32">
+          <svg class="w-12 h-12 text-gray-400 mx-auto mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/>
+          </svg>
+          <p class="text-lg font-semibold text-gray-800 mb-2">Terjadi Kesalahan</p>
+          <p class="text-sm text-gray-500 mb-6">Gagal memuat data dashboard admin.</p>
+          <button @click="fetchData(false)" class="px-6 py-2.5 bg-black text-white rounded-lg text-sm font-medium hover:bg-gray-800 transition-colors">
+            Coba Lagi
+          </button>
+        </div>
+
+        <template v-else>
+          <!-- Header -->
+          <div class="mb-8">
           <span
             class="text-xs font-semibold tracking-[0.2em] uppercase text-gray-400"
             >Admin Panel</span
@@ -365,6 +314,7 @@ function actStyle(type) {
             </div>
             <p class="text-sm text-gray-700 flex-1">{{ alert.text }}</p>
             <button
+              @click="alert.to ? $router.push(alert.to) : null"
               class="text-xs text-gray-500 hover:text-black font-medium transition-colors shrink-0"
             >
               {{ alert.action }}
@@ -806,7 +756,7 @@ function actStyle(type) {
               <p class="text-white/50 text-xs uppercase tracking-widest mb-3">
                 Total Transaksi
               </p>
-              <p class="text-white font-bold text-3xl">Rp 2,4 M</p>
+              <p class="text-white font-bold text-3xl">{{ formatRp(financial.totalTransactions) }}</p>
               <p class="text-white/40 text-xs mt-1.5">
                 Nilai total seluruh lelang selesai
               </p>
@@ -815,19 +765,20 @@ function actStyle(type) {
               >
                 <div>
                   <p class="text-white/40 text-xs mb-1">Rata-rata/lelang</p>
-                  <p class="text-white text-sm font-semibold">Rp 11,2 Jt</p>
+                  <p class="text-white text-sm font-semibold">{{ formatRp(financial.averageTransaction) }}</p>
                 </div>
                 <div>
-                  <p class="text-white/40 text-xs mb-1">Komisi platform</p>
-                  <p class="text-white text-sm font-semibold">Rp 192 Jt</p>
+                  <p class="text-white/40 text-xs mb-1">Komisi platform (8%)</p>
+                  <p class="text-white text-sm font-semibold">{{ formatRp(financial.commissionPlatform) }}</p>
                 </div>
               </div>
             </div>
           </div>
         </div>
-      </main>
-    </div>
+      </template>
+    </main>
   </div>
+</div>
 </template>
 
 <style scoped>
