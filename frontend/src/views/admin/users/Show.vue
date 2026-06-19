@@ -1,20 +1,62 @@
 <script setup>
-import { ref, computed } from "vue";
-import { useRouter } from "vue-router";
+import { ref, computed, onMounted } from "vue";
+import { useRouter, useRoute } from "vue-router";
+import { getAdminUser, updateAdminUser, deleteAdminUser } from "../../../api/admin";
 
 const router = useRouter();
+const route = useRoute();
 
-// ─── User data (ganti dengan API call) ───────────────────────
+const isLoading = ref(true);
+const isError = ref(false);
+
+// ─── User data ───────────────────────────────────────────────
 const user = ref({
-  name: "I Putu Arya Pratama",
-  username: "putuarya",
-  email: "putuarya@gmail.com",
-  phone: "+62 812-0001-0001",
-  address: "Denpasar, Bali",
-  joinedAt: "10 Januari 2026",
-  lastLogin: "15 Juni 2026, 20.15 WITA",
-  role: "Kolektor",
+  id: null,
+  name: "",
+  username: "",
+  email: "",
+  phone: "",
+  address: "",
+  joinedAt: "",
+  lastLogin: "",
+  role: "",
   status: "active",
+  totalAuctions: 0,
+  totalBids: 0,
+  wonAuctions: 0,
+  watchlist: 0,
+  totalBidVal: 0,
+  totalSalesVal: 0,
+  ach_won: 0,
+  ach_sold: 0,
+  ach_bids: 0,
+  alerts: [],
+  notifications: [],
+  recentActivities: [],
+  auctionHistory: [],
+  bidHistory: [],
+  watchlistItems: [],
+  loginHistory: [],
+  systemActivity: [],
+});
+
+async function fetchUserData() {
+  isLoading.value = true;
+  isError.value = false;
+  try {
+    const res = await getAdminUser(route.params.id);
+    user.value = res.data.user;
+    selectedRole.value = (user.value.rawRole === "admin") ? "Admin" : "User";
+  } catch (err) {
+    console.error("Gagal mengambil detail pengguna:", err);
+    isError.value = true;
+  } finally {
+    isLoading.value = false;
+  }
+}
+
+onMounted(() => {
+  fetchUserData();
 });
 
 const profileInfo = computed(() => [
@@ -46,76 +88,66 @@ const profileInfo = computed(() => [
 ]);
 
 // ─── Stats ───────────────────────────────────────────────────
-const userStats = [
+const userStats = computed(() => [
   {
     label: "Total Lelang",
-    value: "18",
+    value: user.value.totalAuctions ? user.value.totalAuctions.toString() : "0",
     dark: false,
     icon: "M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2",
   },
   {
     label: "Total Penawaran",
-    value: "52",
+    value: user.value.totalBids ? user.value.totalBids.toString() : "0",
     dark: true,
     icon: "M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z",
   },
   {
     label: "Lelang Menang",
-    value: "6",
+    value: user.value.wonAuctions ? user.value.wonAuctions.toString() : "0",
     dark: false,
     icon: "M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z",
   },
   {
     label: "Watchlist",
-    value: "15",
+    value: user.value.watchlist ? user.value.watchlist.toString() : "0",
     dark: false,
     icon: "M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z",
   },
   {
     label: "Total Nilai Bid",
-    value: "Rp 125 Jt",
+    value: formatRp(user.value.totalBidVal || 0),
     dark: false,
     icon: "M13 7h8m0 0V3m0 4l-8 8-4-4-6 6",
   },
   {
     label: "Total Nilai Jual",
-    value: "Rp 87 Jt",
+    value: formatRp(user.value.totalSalesVal || 0),
     dark: false,
     icon: "M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z",
   },
-];
+]);
 
-const achievements = [
+const achievements = computed(() => [
   {
     label: "Lelang Dimenangkan",
-    value: "6",
+    value: user.value.ach_won ? user.value.ach_won.toString() : "0",
     icon: "M5 3v4M3 5h4M6 17v4m-2-2h4m5-16l2.286 6.857L21 12l-5.714 2.143L13 21l-2.286-6.857L5 12l5.714-2.143L13 3z",
   },
   {
     label: "Lelang Terjual",
-    value: "15",
+    value: user.value.ach_sold ? user.value.ach_sold.toString() : "0",
     icon: "M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10",
   },
   {
     label: "Total Bid Berhasil",
-    value: "52",
+    value: user.value.ach_bids ? user.value.ach_bids.toString() : "0",
     icon: "M13 10V3L4 14h7v7l9-11h-7z",
   },
-];
+]);
 
-// ─── Alerts ──────────────────────────────────────────────────
-const alerts = [
-  {
-    text: "Tidak ditemukan aktivitas mencurigakan pada akun ini.",
-    dark: false,
-    icon: "M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z",
-  },
-  {
-    text: "Terdapat 1 laporan pengguna terkait akun ini yang sedang ditinjau.",
-    dark: true,
-    icon: "M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z",
-  },
-];
+// ─── Alerts & Notifications ──────────────────────────────────
+const alerts = computed(() => user.value.alerts || []);
+const notifications = computed(() => user.value.notifications || []);
 
 // ─── Tabs ────────────────────────────────────────────────────
 const tabs = [
@@ -129,238 +161,35 @@ const tabs = [
 const activeTab = ref("activity");
 
 // ─── Tab data ────────────────────────────────────────────────
-const recentActivities = [
-  {
-    text: 'Mengikuti lelang "Patung Garuda Bali"',
-    time: "15 Jun 2026, 20.10 WITA",
-    dark: false,
-    icon: "M15 12a3 3 0 11-6 0 3 3 0 016 0z M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z",
-  },
-  {
-    text: "Melakukan penawaran sebesar Rp 12.500.000",
-    time: "15 Jun 2026, 19.25 WITA",
-    dark: true,
-    icon: "M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z",
-  },
-  {
-    text: 'Menambahkan "Harmoni Semesta" ke Watchlist',
-    time: "15 Jun 2026, 18.30 WITA",
-    dark: false,
-    icon: "M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z",
-  },
-  {
-    text: 'Membuat lelang baru "Lukisan Bali Klasik"',
-    time: "14 Jun 2026, 10.00 WITA",
-    dark: false,
-    icon: "M12 4v16m8-8H4",
-  },
-  {
-    text: 'Memenangkan lelang "Topeng Barong Antik"',
-    time: "12 Jun 2026, 20.00 WITA",
-    dark: true,
-    icon: "M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z",
-  },
-];
+const recentActivities = computed(() => user.value.recentActivities || []);
 
-const auctionMiniStats = [
-  { label: "Total Lelang", value: "18" },
-  { label: "Lelang Aktif", value: "3" },
-  { label: "Selesai", value: "15" },
-];
+const auctionMiniStats = computed(() => [
+  { label: "Total Lelang", value: user.value.totalAuctions ? user.value.totalAuctions.toString() : "0" },
+  { label: "Lelang Aktif", value: user.value.auctionHistory ? user.value.auctionHistory.filter(a => a.status === 'active').length.toString() : "0" },
+  { label: "Selesai", value: user.value.auctionHistory ? user.value.auctionHistory.filter(a => a.status === 'ended').length.toString() : "0" },
+]);
 
-const auctionHistory = [
-  {
-    id: 1,
-    name: "Lukisan Bali Klasik Tahun 1980",
-    image:
-      "https://images.unsplash.com/photo-1541701494587-cb58502866ab?w=100&q=80",
-    startPrice: 5000000,
-    finalPrice: 12500000,
-    status: "ended",
-  },
-  {
-    id: 2,
-    name: "Patung Garuda Bali",
-    image:
-      "https://images.unsplash.com/photo-1578926288207-32356f3e5e93?w=100&q=80",
-    startPrice: 8000000,
-    finalPrice: 15000000,
-    status: "active",
-  },
-  {
-    id: 3,
-    name: "Topeng Barong Antik",
-    image:
-      "https://images.unsplash.com/photo-1567359781514-3b964e2b04d6?w=100&q=80",
-    startPrice: 3000000,
-    finalPrice: 7500000,
-    status: "ended",
-  },
-  {
-    id: 4,
-    name: "Harmoni Semesta",
-    image:
-      "https://images.unsplash.com/photo-1460661419201-fd4cecdf8a8b?w=100&q=80",
-    startPrice: 7500000,
-    finalPrice: 7500000,
-    status: "upcoming",
-  },
-];
+const auctionHistory = computed(() => user.value.auctionHistory || []);
 
-const bidMiniStats = [
-  { label: "Total Bid", value: "52" },
-  { label: "Bid Menang", value: "6" },
-  { label: "Bid Kalah", value: "31" },
-  { label: "Outbid", value: "15" },
-];
+const bidMiniStats = computed(() => [
+  { label: "Total Bid", value: user.value.totalBids ? user.value.totalBids.toString() : "0" },
+  { label: "Bid Menang", value: user.value.bidHistory ? user.value.bidHistory.filter(b => b.status === 'won').length.toString() : "0" },
+  { label: "Bid Kalah", value: user.value.bidHistory ? user.value.bidHistory.filter(b => b.status === 'lost').length.toString() : "0" },
+  { label: "Outbid", value: user.value.bidHistory ? user.value.bidHistory.filter(b => b.status === 'outbid').length.toString() : "0" },
+]);
 
-const bidHistory = [
-  {
-    id: 1,
-    name: "Patung Garuda Bali",
-    amount: 12500000,
-    status: "leading",
-    time: "15 Jun 2026, 19.25 WITA",
-  },
-  {
-    id: 2,
-    name: "Topeng Barong Antik",
-    amount: 7500000,
-    status: "won",
-    time: "12 Jun 2026, 20.00 WITA",
-  },
-  {
-    id: 3,
-    name: "Lukisan Bali Klasik",
-    amount: 10000000,
-    status: "outbid",
-    time: "10 Jun 2026, 18.45 WITA",
-  },
-  {
-    id: 4,
-    name: "Ukiran Kayu Garuda",
-    amount: 14000000,
-    status: "lost",
-    time: "8 Jun 2026, 17.00 WITA",
-  },
-  {
-    id: 5,
-    name: "Harmoni Semesta",
-    amount: 9500000,
-    status: "outbid",
-    time: "7 Jun 2026, 15.30 WITA",
-  },
-];
+const bidHistory = computed(() => user.value.bidHistory || []);
 
-const watchlistItems = [
-  {
-    id: 1,
-    name: "Patung Garuda Bali",
-    image:
-      "https://images.unsplash.com/photo-1578926288207-32356f3e5e93?w=100&q=80",
-    category: "Patung",
-    currentPrice: 15000000,
-    status: "active",
-  },
-  {
-    id: 2,
-    name: "Lukisan Tradisional Bali",
-    image:
-      "https://images.unsplash.com/photo-1541701494587-cb58502866ab?w=100&q=80",
-    category: "Lukisan",
-    currentPrice: 9000000,
-    status: "active",
-  },
-  {
-    id: 3,
-    name: "Sunrise Penida",
-    image:
-      "https://images.unsplash.com/photo-1565193566173-7a0ee3dbe261?w=100&q=80",
-    category: "Foto",
-    currentPrice: 5000000,
-    status: "upcoming",
-  },
-];
+const watchlistItems = computed(() => user.value.watchlistItems || []);
 
-const loginHistory = [
-  {
-    device: "Windows 11",
-    browser: "Google Chrome",
-    ip: "103.xxx.xxx.xxx",
-    time: "15 Jun 2026, 20.15 WITA",
-    icon: "M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z",
-  },
-  {
-    device: "Android",
-    browser: "Chrome Mobile",
-    ip: "103.xxx.xxx.xxx",
-    time: "14 Jun 2026, 09.30 WITA",
-    icon: "M12 18h.01M8 21h8a2 2 0 002-2V5a2 2 0 00-2-2H8a2 2 0 00-2 2v14a2 2 0 002 2z",
-  },
-  {
-    device: "MacOS",
-    browser: "Safari",
-    ip: "202.xxx.xxx.xxx",
-    time: "13 Jun 2026, 14.00 WITA",
-    icon: "M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z",
-  },
-];
+const loginHistory = computed(() => user.value.loginHistory || []);
 
-const systemActivity = [
-  {
-    text: "Akun berhasil dibuat",
-    time: "10 Jan 2026, 08.00 WITA",
-    dark: false,
-    icon: "M18 9v3m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0112 0v1H3v-1z",
-  },
-  {
-    text: "Membuat lelang pertama",
-    time: "15 Jan 2026, 14.30 WITA",
-    dark: false,
-    icon: "M12 4v16m8-8H4",
-  },
-  {
-    text: "Memenangkan lelang pertama",
-    time: "20 Jan 2026, 20.00 WITA",
-    dark: true,
-    icon: "M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z",
-  },
-  {
-    text: "Role diubah menjadi Kolektor oleh Admin",
-    time: "10 Mar 2026, 09.15 WITA",
-    dark: false,
-    icon: "M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z M15 12a3 3 0 11-6 0 3 3 0 016 0z",
-  },
-  {
-    text: "Total 50 penawaran tercapai",
-    time: "1 Jun 2026, 16.00 WITA",
-    dark: false,
-    icon: "M13 10V3L4 14h7v7l9-11h-7z",
-  },
-];
-
-const notifications = [
-  {
-    text: "Tidak ditemukan aktivitas mencurigakan pada akun ini.",
-    dark: false,
-    icon: "M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z",
-  },
-  {
-    text: "Pengguna memiliki reputasi baik di komunitas platform.",
-    dark: false,
-    icon: "M11.049 2.927c.3-.921 1.603-.921 1.902 0l1.519 4.674a1 1 0 00.95.69h4.915c.969 0 1.371 1.24.588 1.81l-3.976 2.888a1 1 0 00-.363 1.118l1.518 4.674c.3.922-.755 1.688-1.538 1.118l-3.976-2.888a1 1 0 00-1.176 0l-3.976 2.888c-.783.57-1.838-.197-1.538-1.118l1.518-4.674a1 1 0 00-.363-1.118l-3.976-2.888c-.784-.57-.38-1.81.588-1.81h4.914a1 1 0 00.951-.69l1.519-4.674z",
-  },
-  {
-    text: "Terdapat 1 laporan pengguna terkait akun ini yang sedang ditinjau.",
-    dark: true,
-    icon: "M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z",
-  },
-];
+const systemActivity = computed(() => user.value.systemActivity || []);
 
 // ─── Modals ──────────────────────────────────────────────────
 const activeModal = ref(null);
 const selectedRole = ref(user.value.role);
-const roles = ["User", "Kolektor", "Seniman", "Admin", "Super Admin"];
+const roles = ["User", "Admin"];
 
 const genericModalTitle = computed(() => {
   if (activeModal.value === "resetPassword") return "Reset Password";
@@ -379,25 +208,52 @@ function openModal(name) {
   activeModal.value = name;
 }
 
-function handleRoleChange() {
-  user.value.role = selectedRole.value;
-  activeModal.value = null;
+async function handleRoleChange() {
+  try {
+    const rawRole = selectedRole.value;
+    const dbRole = (rawRole === "Admin" || rawRole === "Super Admin") ? "admin" : "user";
+    await updateAdminUser(user.value.id, { role: dbRole });
+    await fetchUserData();
+  } catch (err) {
+    console.error("Gagal mengubah role pengguna:", err);
+    alert(err.response?.data?.message || "Gagal mengubah role.");
+  } finally {
+    activeModal.value = null;
+  }
 }
-function handleStatusChange(status) {
-  user.value.status = status;
-  activeModal.value = null;
+
+async function handleStatusChange(status) {
+  try {
+    await updateAdminUser(user.value.id, { status });
+    await fetchUserData();
+  } catch (err) {
+    console.error("Gagal mengubah status pengguna:", err);
+    alert(err.response?.data?.message || "Gagal mengubah status.");
+  } finally {
+    activeModal.value = null;
+  }
 }
-function handleDelete() {
-  activeModal.value = null;
-  router.push("/admin/users");
+
+async function handleDelete() {
+  try {
+    await deleteAdminUser(user.value.id);
+    activeModal.value = null;
+    router.push("/admin/users");
+  } catch (err) {
+    console.error("Gagal menghapus pengguna:", err);
+    alert(err.response?.data?.message || "Gagal menghapus pengguna.");
+    activeModal.value = null;
+  }
 }
 
 // ─── Helpers ─────────────────────────────────────────────────
 function formatRp(val) {
-  return "Rp " + val.toLocaleString("id-ID");
+  if (val === undefined || val === null) return "Rp 0";
+  return "Rp " + Number(val).toLocaleString("id-ID");
 }
 
 function initials(name) {
+  if (!name) return "";
   return name
     .split(" ")
     .map((w) => w[0])
@@ -557,40 +413,59 @@ function bidStatusBadge(status) {
       </div>
     </div>
 
-    <!-- ═══════════════════ ALERT BANNERS ═══════════════════ -->
-    <div class="space-y-2 mb-6">
-      <div
-        v-for="alert in alerts"
-        :key="alert.text"
-        class="flex items-center gap-3 bg-white border border-gray-200 rounded-xl px-4 py-3"
-      >
-        <div
-          :class="[
-            'w-7 h-7 rounded-lg flex items-center justify-center shrink-0',
-            alert.dark ? 'bg-black' : 'bg-gray-100',
-          ]"
-        >
-          <svg
-            class="w-3.5 h-3.5"
-            :class="alert.dark ? 'text-white' : 'text-gray-600'"
-            fill="none"
-            stroke="currentColor"
-            viewBox="0 0 24 24"
-          >
-            <path
-              stroke-linecap="round"
-              stroke-linejoin="round"
-              stroke-width="2"
-              :d="alert.icon"
-            />
-          </svg>
-        </div>
-        <p class="text-sm text-gray-700 flex-1">{{ alert.text }}</p>
-      </div>
+    <!-- Loading state -->
+    <div v-if="isLoading" class="flex flex-col items-center justify-center py-32 bg-white rounded-2xl border border-gray-100 mb-6">
+      <div class="w-8 h-8 border-2 border-black border-t-transparent rounded-full animate-spin mb-4"></div>
+      <p class="text-xs text-gray-500 font-medium">Memuat data detail pengguna...</p>
     </div>
 
-    <!-- ═══════════════════ MAIN GRID ═══════════════════ -->
-    <div class="grid grid-cols-1 xl:grid-cols-3 gap-6">
+    <!-- Error state -->
+    <div v-else-if="isError" class="py-32 text-center bg-white rounded-2xl border border-gray-100 mb-6">
+      <svg class="w-12 h-12 text-gray-400 mx-auto mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/>
+      </svg>
+      <p class="font-medium text-gray-700 text-sm mb-1">Gagal memuat detail pengguna</p>
+      <p class="text-gray-400 text-xs mb-4">Terjadi kesalahan pada server atau data tidak ditemukan.</p>
+      <button @click="fetchUserData" class="px-4 py-2 bg-black text-white rounded-lg text-xs font-medium hover:bg-gray-800 transition-colors">
+        Coba Lagi
+      </button>
+    </div>
+
+    <template v-else>
+      <!-- ═══════════════════ ALERT BANNERS ═══════════════════ -->
+      <div v-if="alerts.length > 0" class="space-y-2 mb-6">
+        <div
+          v-for="alert in alerts"
+          :key="alert.text"
+          class="flex items-center gap-3 bg-white border border-gray-200 rounded-xl px-4 py-3"
+        >
+          <div
+            :class="[
+              'w-7 h-7 rounded-lg flex items-center justify-center shrink-0',
+              alert.dark ? 'bg-black' : 'bg-gray-100',
+            ]"
+          >
+            <svg
+              class="w-3.5 h-3.5"
+              :class="alert.dark ? 'text-white' : 'text-gray-600'"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
+              <path
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                stroke-width="2"
+                :d="alert.icon"
+              />
+            </svg>
+          </div>
+          <p class="text-sm text-gray-700 flex-1">{{ alert.text }}</p>
+        </div>
+      </div>
+
+      <!-- ═══════════════════ MAIN GRID ═══════════════════ -->
+      <div class="grid grid-cols-1 xl:grid-cols-3 gap-6">
       <!-- ── LEFT COL: Profile + Actions ── -->
       <div class="space-y-4">
         <!-- Profile card -->
@@ -640,8 +515,7 @@ function bidStatusBadge(status) {
             <p class="text-xs text-gray-400 mt-0.5">@{{ user.username }}</p>
             <span
               class="inline-block mt-2 text-xs bg-gray-100 text-gray-600 px-2.5 py-0.5 rounded-full font-medium"
-              >{{ user.role }}</span
-            >
+              >{{ user.role }}</span>
 
             <div class="mt-5 space-y-2.5">
               <div
@@ -685,25 +559,7 @@ function bidStatusBadge(status) {
             Tindakan Administrator
           </p>
           <div class="space-y-2">
-            <button
-              @click="openModal('editRole')"
-              class="w-full flex items-center gap-3 px-4 py-2.5 border border-gray-200 text-gray-700 rounded-xl text-sm font-medium hover:border-black hover:text-black transition-all duration-200 text-left"
-            >
-              <svg
-                class="w-4 h-4 shrink-0"
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
-              >
-                <path
-                  stroke-linecap="round"
-                  stroke-linejoin="round"
-                  stroke-width="2"
-                  d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"
-                />
-              </svg>
-              Edit Profil
-            </button>
+
             <button
               @click="openModal('editRole')"
               class="w-full flex items-center gap-3 px-4 py-2.5 border border-gray-200 text-gray-700 rounded-xl text-sm font-medium hover:border-black hover:text-black transition-all duration-200 text-left"
@@ -1380,6 +1236,7 @@ function bidStatusBadge(status) {
         </div>
       </div>
     </div>
+  </template>
 
     <!-- ═══════════════════ MODALS ═══════════════════ -->
     <transition name="fade-modal">
@@ -1398,7 +1255,7 @@ function bidStatusBadge(status) {
           <h3 class="font-bold text-lg text-black mb-1">Ubah Role</h3>
           <p class="text-gray-400 text-xs mb-5">
             Role saat ini:
-            <span class="text-black font-semibold">{{ user.role }}</span>
+            <span class="text-black font-semibold">{{ selectedRole }}</span>
           </p>
           <div class="space-y-2 mb-6">
             <label
@@ -1410,6 +1267,7 @@ function bidStatusBadge(status) {
                   ? 'border-black bg-gray-50'
                   : 'border-gray-200 hover:border-gray-400'
               "
+              @click="selectedRole = r"
             >
               <div
                 :class="[
@@ -1424,7 +1282,6 @@ function bidStatusBadge(status) {
               </div>
               <span
                 class="text-sm font-medium text-black"
-                @click="selectedRole = r"
                 >{{ r }}</span
               >
             </label>
