@@ -563,16 +563,34 @@ class AuctionController extends Controller
     }
 
     /**
-     * Delete an auction (soft delete).
+     * Delete an auction (permanent force delete - admin only).
      */
     public function destroy($id): JsonResponse
     {
         try {
             $auction = Auction::withTrashed()->findOrFail($id);
-            $auction->delete();
+            \Illuminate\Support\Facades\DB::transaction(function () use ($auction) {
+                // Delete photos from disk and database
+                foreach ($auction->images as $img) {
+                    \Storage::disk($img->storage_disk)->delete($img->image_path);
+                    $img->delete();
+                }
+
+                // Delete bid history
+                $auction->bids()->delete();
+
+                // Delete winner info
+                $auction->winner()->delete();
+
+                // Delete watchlists
+                \DB::table('watchlists')->where('auction_id', $auction->id)->delete();
+
+                // Force delete the auction
+                $auction->forceDelete();
+            });
 
             return response()->json([
-                'message' => 'Lelang berhasil dihapus oleh admin.',
+                'message' => 'Lelang berhasil dihapus secara permanen oleh admin.',
             ]);
         } catch (\Exception $e) {
             return response()->json([
@@ -580,4 +598,179 @@ class AuctionController extends Controller
             ], 500);
         }
     }
+
+    /**
+     * Get auction details (including soft-deleted - admin only).
+     */
+    public function show($id): JsonResponse
+    {
+        try {
+            $auction = Auction::withTrashed()->with([
+                'seller',
+                'category',
+                'images',
+                'bids.bidder',
+                'winner.winner',
+            ])->findOrFail($id);
+
+            $statusMap = [
+                'scheduled' => 'upcoming',
+                'active'    => 'active',
+                'ended'     => 'ended',
+            ];
+
+            $images = $auction->images->sortBy('sort_order')->values();
+
+            // Format bids
+            $bids = $auction->bids->map(function ($bid) {
+                return [
+                    'id'     => $bid->id,
+                    'name'   => $bid->bidder?->full_name ?? 'Anonim',
+                    'email'  => $bid->bidder?->email ?? '',
+                    'avatar' => $bid->bidder?->avatar
+                        ? \Storage::disk(config('filesystems.default'))->url($bid->bidder->avatar)
+                        : 'https://i.pravatar.cc/32?u=' . $bid->bidder_id,
+                    'amount' => (float) $bid->amount,
+                    'time'   => $bid->placed_at
+                        ? \Carbon\Carbon::parse($bid->placed_at)->setTimezone('Asia/Makassar')->format('d M Y, H.i \W\I\T\A')
+                        : $bid->created_at->setTimezone('Asia/Makassar')->format('d M Y, H.i \W\I\T\A'),
+                    'status' => ($bid->status === 'active' || $bid->status === 'won') ? 'highest' : 'outbid',
+                ];
+            })->sortByDesc('amount')->values();
+
+            // System Activities (timeline)
+            $systemActivity = [];
+            // 1. Creation activity
+            $systemActivity[] = [
+                'text' => 'Lelang dibuat oleh ' . ($auction->seller?->full_name ?? 'Penjual'),
+                'time' => $auction->created_at->setTimezone('Asia/Makassar')->format('d M Y, H.i \W\I\T\A'),
+                'icon' => 'M12 4v16m8-8H4',
+            ];
+
+            // 2. Bid activities
+            foreach ($auction->bids->sortBy('created_at') as $bid) {
+                $systemActivity[] = [
+                    'text' => 'Penawaran masuk sebesar Rp ' . number_format($bid->amount, 0, ',', '.') . ' oleh ' . ($bid->bidder?->full_name ?? 'Anonim'),
+                    'time' => ($bid->placed_at ? \Carbon\Carbon::parse($bid->placed_at) : $bid->created_at)->setTimezone('Asia/Makassar')->format('d M Y, H.i \W\I\T\A'),
+                    'icon' => 'M13 10V3L4 14h7v7l9-11h-7z',
+                ];
+            }
+
+            // 3. Victory/Cancellation activities
+            if ($auction->status === 'cancelled') {
+                $systemActivity[] = [
+                    'text' => 'Lelang dibatalkan oleh Administrator',
+                    'time' => $auction->updated_at->setTimezone('Asia/Makassar')->format('d M Y, H.i \W\I\T\A'),
+                    'icon' => 'M6 18L18 6M6 6l12 12',
+                ];
+            } elseif ($auction->status === 'ended') {
+                if ($auction->winner) {
+                    $systemActivity[] = [
+                        'text' => 'Pemenang berhasil ditentukan: ' . ($auction->winner->winner?->full_name ?? '—'),
+                        'time' => \Carbon\Carbon::parse($auction->winner->created_at)->setTimezone('Asia/Makassar')->format('d M Y, H.i \W\I\T\A'),
+                        'icon' => 'M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z',
+                    ];
+                } else {
+                    $systemActivity[] = [
+                        'text' => 'Lelang berakhir tanpa pemenang',
+                        'time' => $auction->ends_at->setTimezone('Asia/Makassar')->format('d M Y, H.i \W\I\T\A'),
+                        'icon' => 'M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z',
+                    ];
+                }
+            }
+
+            // Winner info
+            $winner = null;
+            if ($auction->winner) {
+                $winner = [
+                    'name'          => $auction->winner->winner?->full_name ?? '—',
+                    'finalPrice'    => (float) $auction->winner->final_price,
+                    'closedAt'      => \Carbon\Carbon::parse($auction->winner->created_at)->setTimezone('Asia/Makassar')->format('d M Y, H.i \W\I\T\A'),
+                    'paymentStatus' => $auction->winner->payment_status === 'paid' ? 'Lunas' : 'Belum Bayar',
+                ];
+            }
+
+            // Seller stats
+            $seller = $auction->seller;
+            $sellerStats = [
+                'name'              => $seller?->full_name ?? '—',
+                'email'             => $seller?->email ?? '—',
+                'phone'             => $seller?->phone ?? '—',
+                'joinDate'          => $seller?->created_at ? $seller->created_at->setTimezone('Asia/Makassar')->format('d M Y') : '—',
+                'status'            => 'active',
+                'totalAuctions'     => $seller ? Auction::withTrashed()->where('seller_id', $seller->id)->count() : 0,
+                'completedAuctions' => $seller ? Auction::withTrashed()->where('seller_id', $seller->id)->where('status', 'ended')->count() : 0,
+                'activeAuctions'    => $seller ? Auction::withTrashed()->where('seller_id', $seller->id)->where('status', 'active')->count() : 0,
+                'totalSold'         => $seller ? Auction::withTrashed()->where('seller_id', $seller->id)->where('status', 'ended')->has('winner')->count() : 0,
+                'avatar'            => $seller?->avatar ? \Storage::disk(config('filesystems.default'))->url($seller->avatar) : null,
+            ];
+
+            $uniqueBiddersCount = $auction->bids->pluck('bidder_id')->unique()->count();
+            
+            // Format status: if soft-deleted, status is 'deleted'
+            $status = $auction->deleted_at ? 'deleted' : ($statusMap[$auction->status] ?? $auction->status);
+
+            // Notifications
+            $notifications = [];
+            if ($auction->deleted_at) {
+                $notifications[] = [
+                    'type' => 'warning',
+                    'text' => 'Lelang ini telah dihapus (soft delete) oleh penjual pada ' . $auction->deleted_at->setTimezone('Asia/Makassar')->format('d M Y, H.i \W\I\T\A') . '.',
+                ];
+            } else if ($auction->status === 'active' && $auction->ends_at->diffInHours(now()) < 24) {
+                $notifications[] = [
+                    'type' => 'warning',
+                    'text' => 'Lelang akan berakhir dalam waktu kurang dari 24 jam.',
+                ];
+            }
+
+            return response()->json([
+                'auction' => [
+                    'id'            => $auction->id,
+                    'name'          => $auction->title,
+                    'category'      => $auction->category?->name ?? 'Lainnya',
+                    'description'   => $auction->description,
+                    'images'        => $images->map(fn($img) => $img->url)->values(),
+                    'startPrice'    => (float) $auction->starting_price,
+                    'currentPrice'  => (float) $auction->current_price,
+                    'minIncrement'  => (float) $auction->bid_increment,
+                    'totalBids'     => $auction->bids->count(),
+                    'status'        => $status,
+                    'startDate'     => $auction->starts_at?->setTimezone('Asia/Makassar')->format('d M Y, H.i \W\I\T\A'),
+                    'endDate'       => $auction->ends_at?->setTimezone('Asia/Makassar')->format('d M Y, H.i \W\I\T\A'),
+                    'endTimestamp'  => $auction->ends_at?->timestamp * 1000,
+                    'seller'        => $sellerStats,
+                    'stats' => [
+                        'totalViewers'   => 12 + $auction->bids->count() * 3,
+                        'currentViewers' => $auction->status === 'active' ? rand(2, 6) : 0,
+                        'bidsLastHour'   => $auction->bids->where('created_at', '>=', now()->subHour())->count(),
+                        'bidsLast24h'    => $auction->bids->where('created_at', '>=', now()->subDay())->count(),
+                        'lowestBid'      => $auction->bids->min('amount') ?: $auction->starting_price,
+                        'uniqueBidders'  => $uniqueBiddersCount,
+                        'lastActivity'   => $auction->bids->count() > 0 
+                            ? 'Penawaran baru sebesar Rp ' . number_format($auction->bids->max('amount'), 0, ',', '.') . ' oleh ' . ($auction->bids->sortByDesc('amount')->first()->bidder?->full_name ?? 'Anonim') . ' pada ' . ($auction->bids->sortByDesc('amount')->first()->placed_at ? \Carbon\Carbon::parse($auction->bids->sortByDesc('amount')->first()->placed_at) : $auction->bids->sortByDesc('amount')->first()->created_at)->setTimezone('Asia/Makassar')->format('d M Y \p\u\k\u\l H.i \W\I\T\A') . '.'
+                            : 'Lelang dibuat pada ' . $auction->created_at->setTimezone('Asia/Makassar')->format('d M Y \p\u\k\u\l H.i \W\I\T\A') . '.',
+                    ],
+                    'antiSniping' => [
+                        'active'        => true,
+                        'lastExtension' => 'Tidak ada',
+                        'note'          => 'Lelang diperpanjang secara otomatis jika terdapat penawaran pada 30 detik terakhir sebelum penutupan.',
+                    ],
+                    'buyNow' => [
+                        'used'  => $auction->bids->where('amount', '>=', $auction->buy_now_price)->count() > 0 && $auction->buy_now_price > 0,
+                        'price' => $auction->buy_now_price ? (float) $auction->buy_now_price : 0,
+                    ],
+                    'notifications' => $notifications,
+                    'winner'        => $winner,
+                ],
+                'bidHistory' => $bids,
+                'systemActivity' => $systemActivity,
+            ]);
+        } catch (\Exception $e) {
+            return response()->json([
+                'message' => 'Gagal memuat detail lelang: ' . $e->getMessage()
+            ], 500);
+        }
+    }
 }
+

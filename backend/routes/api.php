@@ -114,6 +114,7 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::middleware('admin')->prefix('admin')->group(function () {
         Route::get('dashboard',                      [AdminAuctionController::class, 'dashboard']);
         Route::get('auctions',                      [AdminAuctionController::class, 'index']);
+        Route::get('auctions/{auction}',            [AdminAuctionController::class, 'show']);
         Route::patch('auctions/{auction}/end',      [AdminAuctionController::class, 'forceEnd']);
         Route::patch('auctions/{auction}/activate', [AdminAuctionController::class, 'activate']);
         Route::delete('auctions/{auction}',         [AdminAuctionController::class, 'destroy']);
