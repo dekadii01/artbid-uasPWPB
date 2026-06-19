@@ -41,6 +41,12 @@ const routes = [
     meta: { layout: "default", guestOnly: true },
   },
   {
+    path: "/auth/google/callback",
+    name: "GoogleCallback",
+    component: () => import("../views/auth/GoogleCallback.vue"),
+    meta: { layout: "default", guestOnly: true },
+  },
+  {
     path: "/auctions",
     name: "Auctions",
     component: AuctionIndexView,

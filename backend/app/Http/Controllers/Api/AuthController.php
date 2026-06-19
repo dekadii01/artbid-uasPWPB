@@ -11,6 +11,9 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Hash;
 
+use Laravel\Socialite\Facades\Socialite;
+use Illuminate\Support\Str;
+
 class AuthController extends Controller
 {
     /**
@@ -87,5 +90,64 @@ class AuthController extends Controller
         return response()->json([
             'message' => 'Logout berhasil.',
         ]);
+    }
+
+    /**
+     * Redirect the user to the Google authentication page.
+     *
+     * GET /api/auth/google/redirect
+     */
+    public function redirectToGoogle()
+    {
+        return Socialite::driver('google')->stateless()->redirect();
+    }
+
+    /**
+     * Obtain the user information from Google and login/register.
+     *
+     * GET /api/auth/google/callback
+     */
+    public function handleGoogleCallback()
+    {
+        try {
+            $googleUser = Socialite::driver('google')->stateless()->user();
+
+            // Pisahkan nama depan dan belakang dari nama lengkap Google
+            $nameParts = explode(' ', $googleUser->getName(), 2);
+            $firstName = $nameParts[0] ?? $googleUser->getName();
+            $lastName  = $nameParts[1] ?? '';
+            
+            // Temukan atau buat user berdasarkan email dari Google.
+            // Catatan:
+            // - 'phone' wajib string kosong karena kolom NOT NULL di DB
+            // - 'password' cukup plain random string karena User model sudah
+            //   punya cast 'hashed' yang otomatis hash saat assign
+            $user = User::firstOrCreate([
+                'email' => $googleUser->getEmail(),
+            ], [
+                'first_name' => $firstName,
+                'last_name'  => $lastName,
+                'phone'      => '',
+                'password'   => Str::random(24),
+                'role'       => 'user',
+                'status'     => 'active',
+            ]);
+
+            if ($user->status === 'blocked') {
+                return redirect('http://localhost:5173/login?error=blocked');
+            }
+
+            // Hapus token lama & buat token baru
+            $user->tokens()->delete();
+            $token = $user->createToken('auth_token')->plainTextToken;
+
+            // Redirect ke halaman callback frontend untuk menyimpan token
+            return redirect('http://localhost:5173/auth/google/callback?token=' . $token);
+        } catch (\Exception $e) {
+            \Illuminate\Support\Facades\Log::error('Google OAuth failed: ' . $e->getMessage(), [
+                'trace' => $e->getTraceAsString(),
+            ]);
+            return redirect('http://localhost:5173/login?error=oauth_failed');
+        }
     }
 }

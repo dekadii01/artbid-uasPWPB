@@ -3,8 +3,10 @@ import { ref, computed, onMounted, onUnmounted, watch } from "vue";
 import { useRouter } from "vue-router";
 import Navbar from "../../components/Appnavbar.vue";
 import { getAuctions } from "../../api/auctions";
+import { useAuthStore } from "../../stores/auth";
 
 const router = useRouter();
+const authStore = useAuthStore();
 
 // ─── Helpers ─────────────────────────────────────────────────────
 function formatRupiah(value) {
@@ -78,6 +80,7 @@ const meta = ref({
 // Status counts — dihitung dari total per-status lewat API terpisah
 // Untuk kesederhanaan, kita fetch semua lalu hitung di sini
 const statusCounts = ref({ all: 0, live: 0, upcoming: 0, ended: 0 });
+const todayBidsCount = ref(0);
 
 async function fetchAuctions() {
   isLoading.value = true;
@@ -125,6 +128,7 @@ async function fetchAuctions() {
       total: data.total,
       per_page: data.per_page,
     };
+    todayBidsCount.value = data.today_bids_count ?? 0;
 
     // Hitung status counts saat filter = all (untuk badge di tab)
     if (
@@ -215,7 +219,7 @@ const platformStats = [
     label: "Lelang Aktif",
     value: computed(() => statusCounts.value.live.toString()),
   },
-  { key: "bids", label: "Total Penawaran Hari Ini", value: ref("—") },
+  { key: "bids", label: "Total Penawaran Hari Ini", value: todayBidsCount },
   {
     key: "sold",
     label: "Barang Terjual",
@@ -677,14 +681,14 @@ const goToAuction = (id) => router.push(`/auction/${id}`);
                   @click="goToAuction(auction.id)"
                   class="w-full py-2.5 bg-black text-white rounded-lg text-sm font-medium hover:bg-gray-800 transition-colors"
                 >
-                  Tawar Sekarang
+                  {{ authStore.user && authStore.user.id === auction.seller_id ? "Lelang Saya" : "Tawar Sekarang" }}
                 </button>
                 <button
                   v-else-if="auction.status === 'upcoming'"
                   @click="goToAuction(auction.id)"
                   class="w-full py-2.5 border border-black text-black rounded-lg text-sm font-medium hover:bg-black hover:text-white transition-colors"
                 >
-                  Lihat Detail
+                  {{ authStore.user && authStore.user.id === auction.seller_id ? "Lelang Saya" : "Lihat Detail" }}
                 </button>
                 <button
                   v-else
