@@ -102,7 +102,11 @@ class AuctionController extends Controller
             return $this->transformAuction($auction);
         });
 
-        return response()->json($auctions);
+        $todayBidsCount = Bid::whereDate('created_at', now()->toDateString())->count();
+        $response = $auctions->toArray();
+        $response['today_bids_count'] = $todayBidsCount;
+
+        return response()->json($response);
     }
 
     /**
