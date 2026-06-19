@@ -50,6 +50,20 @@ export const getAdminAuction = (id) => {
 };
 
 /**
+ * Get all users list (admin only).
+ */
+export const getAdminUsers = () => {
+  return api.get("/admin/users");
+};
+
+/**
+ * Update user details/status (admin only).
+ */
+export const updateAdminUser = (id, data) => {
+  return api.put(`/admin/users/${id}`, data);
+};
+
+/**
  * Get admin report statistics based on period and custom dates.
  */
 export const getAdminReports = (params) => {
@@ -62,6 +76,3 @@ export const getAdminReports = (params) => {
 export const exportAdminReport = (params) => {
   return api.get("/admin/reports/export", { params, responseType: "blob" });
 };
-
-
-

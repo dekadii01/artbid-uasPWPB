@@ -119,6 +119,7 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::patch('auctions/{auction}/end',      [AdminAuctionController::class, 'forceEnd']);
         Route::patch('auctions/{auction}/activate', [AdminAuctionController::class, 'activate']);
         Route::delete('auctions/{auction}',         [AdminAuctionController::class, 'destroy']);
+        Route::get('users',                         [AdminUserController::class, 'index']);
         Route::put('users/{user}',                  [AdminUserController::class, 'update']);
 
         // CRUD Kategori (Admin)
