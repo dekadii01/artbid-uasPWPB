@@ -49,4 +49,19 @@ export const getAdminAuction = (id) => {
   return api.get(`/admin/auctions/${id}`);
 };
 
+/**
+ * Get all users list (admin only).
+ */
+export const getAdminUsers = () => {
+  return api.get("/admin/users");
+};
+
+/**
+ * Update user details/status (admin only).
+ */
+export const updateAdminUser = (id, data) => {
+  return api.put(`/admin/users/${id}`, data);
+};
+
+
 

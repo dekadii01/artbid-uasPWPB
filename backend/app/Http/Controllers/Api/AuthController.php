@@ -54,6 +54,12 @@ class AuthController extends Controller
             ], 401);
         }
 
+        if ($user->status === 'blocked') {
+            return response()->json([
+                'message' => 'Akun Anda telah diblokir oleh administrator.',
+            ], 403);
+        }
+
         // Hapus semua token lama agar tidak menumpuk (opsional, bisa
         // dihapus jika ingin mendukung multi-device login).
         $user->tokens()->delete();
