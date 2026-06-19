@@ -1,6 +1,13 @@
 <script setup>
-import { ref, computed, watch } from "vue";
+import { ref, computed, watch, onMounted } from "vue";
 import { useRouter, useRoute } from "vue-router";
+import {
+  getAuction,
+  updateAuction,
+  deleteAuction,
+  addAuctionImages,
+  deleteAuctionImage,
+} from "../../api/auctions";
 
 const router = useRouter();
 const route = useRoute();
@@ -50,57 +57,60 @@ const minIncrementOptions = [50000, 100000, 250000, 500000, 1000000];
 const todayStr = new Date().toISOString().split("T")[0];
 
 // ─── Auction status ───────────────────────────────────────────────
-// 'upcoming' | 'live' | 'ended'
-// TODO: ambil dari API GET /api/auctions/{id}
 const auctionStatus = ref("upcoming");
-const canEdit = computed(() => auctionStatus.value === "upcoming");
+const canEdit = computed(() => auctionStatus.value === "upcoming" || auctionStatus.value === "scheduled");
 
 // ─── Fetch & populate form ─────────────────────────────────────────
 const isLoading = ref(true);
 
-// TODO: ganti dengan data dari API GET /api/auctions/{id}
-// Simulasi fetch dengan dummy data sesuai status yang ada
-setTimeout(() => {
-  form.value.name = "Lukisan Bali Klasik Tahun 1980";
-  form.value.category = "Lukisan";
-  form.value.condition = "Sangat Baik";
-  form.value.artist = "I Wayan Sukerta";
-  form.value.year = "1980";
-  form.value.description =
-    "Lukisan tradisional Bali karya seniman lokal yang dibuat pada tahun 1980 dengan kondisi sangat baik dan memiliki nilai sejarah tinggi.";
-  form.value.startPrice = 5000000;
-  form.value.minIncrement = 100000;
-  form.value.buyNowEnabled = true;
-  form.value.buyNowPrice = 20000000;
-  form.value.startDate = "2026-06-20";
-  form.value.startTime = "09:00";
-  form.value.endDate = "2026-06-23";
-  form.value.endTime = "21:00";
+async function loadAuctionData() {
+  isLoading.value = true;
+  try {
+    const res = await getAuction(route.params.id);
+    const a = res.data.auction;
 
-  // Foto yang sudah ada (dari API)
-  existingPhotos.value = [
-    {
-      id: 1,
-      url: "https://picsum.photos/seed/art1/800/600",
-      sortOrder: 0,
-      isMain: true,
-    },
-    {
-      id: 2,
-      url: "https://picsum.photos/seed/art2/800/600",
-      sortOrder: 1,
-      isMain: false,
-    },
-    {
-      id: 3,
-      url: "https://picsum.photos/seed/art3/800/600",
-      sortOrder: 2,
-      isMain: false,
-    },
-  ];
+    form.value.name = a.name;
+    form.value.category = a.category;
+    form.value.condition = a.condition;
+    form.value.artist = a.artist ?? "";
+    form.value.year = a.year ?? "";
+    form.value.description = a.description;
+    form.value.startPrice = a.startPrice;
+    form.value.minIncrement = a.minIncrement;
+    form.value.buyNowEnabled = !!a.buyNowPrice;
+    form.value.buyNowPrice = a.buyNowPrice ?? "";
 
-  isLoading.value = false;
-}, 800);
+    if (a.startsAt) {
+      const startsAtDate = new Date(a.startsAt);
+      form.value.startDate = startsAtDate.toISOString().split("T")[0];
+      form.value.startTime = startsAtDate.toTimeString().split(" ")[0].substring(0, 5);
+    }
+    if (a.endsAt) {
+      const endsAtDate = new Date(a.endsAt);
+      form.value.endDate = endsAtDate.toISOString().split("T")[0];
+      form.value.endTime = endsAtDate.toTimeString().split(" ")[0].substring(0, 5);
+    }
+
+    auctionStatus.value = a.status; // 'upcoming' | 'live' | 'ended'
+    
+    existingPhotos.value = (a.images ?? []).map(img => ({
+      id: img.id,
+      url: img.url,
+      sortOrder: img.sortOrder,
+      isMain: img.sortOrder === 0,
+    }));
+  } catch (err) {
+    console.error("Gagal memuat data lelang:", err);
+    alert("Gagal memuat data lelang.");
+    router.push("/my-auctions");
+  } finally {
+    isLoading.value = false;
+  }
+}
+
+onMounted(() => {
+  loadAuctionData();
+});
 
 // ─── Form state ───────────────────────────────────────────────────
 const form = ref({
@@ -251,20 +261,46 @@ async function confirmSave() {
   showSaveModal.value = false;
   isSubmitting.value = true;
 
-  try {
-    // TODO: implementasi API
-    // 1. Hapus foto yang ditandai: DELETE /api/auctions/{id}/images/{imageId}
-    //    for (const photoId of photosToDelete.value) { await deleteAuctionImage(id, photoId) }
-    //
-    // 2. Upload foto baru: POST /api/auctions/{id}/images
-    //    if (newPhotoFiles.value.length > 0) { await addAuctionImages(id, formData) }
-    //
-    // 3. Update data lelang: PUT /api/auctions/{id}
-    //    await updateAuction(id, { title, category, ... })
+  const auctionId = route.params.id;
 
-    await new Promise((r) => setTimeout(r, 1200)); // simulasi
+  try {
+    // 1. Hapus foto yang ditandai
+    for (const photoId of photosToDelete.value) {
+      await deleteAuctionImage(auctionId, photoId);
+    }
+
+    // 2. Upload foto baru jika ada
+    if (newPhotoFiles.value.length > 0) {
+      const formData = new FormData();
+      newPhotoFiles.value.forEach((file) => {
+        formData.append("photos[]", file);
+      });
+      await addAuctionImages(auctionId, formData);
+    }
+
+    // 3. Update data lelang, including the photo order
+    const photoOrder = existingPhotos.value.map((p) => p.id);
+
+    await updateAuction(auctionId, {
+      title: form.value.name,
+      category: form.value.category,
+      condition: form.value.condition,
+      artist: form.value.artist,
+      year: form.value.year,
+      description: form.value.description,
+      starting_price: form.value.startPrice,
+      bid_increment: form.value.minIncrement,
+      buy_now_price: form.value.buyNowEnabled ? form.value.buyNowPrice : null,
+      start_date: form.value.startDate,
+      start_time: form.value.startTime,
+      end_date: form.value.endDate,
+      end_time: form.value.endTime,
+      photo_order: photoOrder,
+    });
+
     router.push("/my-auctions");
   } catch (err) {
+    console.error("Gagal menyimpan perubahan lelang:", err);
     alert(err.response?.data?.message || "Gagal menyimpan perubahan.");
   } finally {
     isSubmitting.value = false;
@@ -277,14 +313,16 @@ function openDeleteModal() {
 
 async function confirmDelete() {
   showDeleteModal.value = false;
+  isSubmitting.value = true;
 
   try {
-    // TODO: DELETE /api/auctions/{id}
-    // await deleteAuction(route.params.id)
-    await new Promise((r) => setTimeout(r, 800)); // simulasi
+    await deleteAuction(route.params.id);
     router.push("/my-auctions");
   } catch (err) {
+    console.error("Gagal menghapus lelang:", err);
     alert(err.response?.data?.message || "Gagal menghapus lelang.");
+  } finally {
+    isSubmitting.value = false;
   }
 }
 

@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Http\Requests\StoreAuctionRequest;
+use App\Http\Requests\UpdateAuctionRequest;
 use App\Models\Auction;
 use App\Models\AuctionImage;
 use App\Models\Category;
@@ -262,6 +263,63 @@ class AuctionController extends Controller
             'message' => 'Lelang berhasil dibuat.',
             'auction' => $auction,
         ], 201);
+    }
+
+    /**
+     * Update lelang (hanya jika status = scheduled dan milik sendiri).
+     */
+    public function update(UpdateAuctionRequest $request, Auction $auction): JsonResponse
+    {
+        // Pastikan lelang milik user yang sedang login
+        if ($auction->seller_id !== $request->user()->id) {
+            return response()->json(['message' => 'Kamu tidak berhak mengubah lelang ini.'], 403);
+        }
+
+        // Hanya boleh diubah jika status scheduled
+        if ($auction->status !== 'scheduled') {
+            return response()->json(['message' => 'Lelang hanya dapat diubah sebelum dimulai.'], 422);
+        }
+
+        $validated = $request->validated();
+
+        DB::transaction(function () use ($validated, $request, $auction) {
+            $categoryModel = Category::firstOrCreate(
+                ['name' => $validated['category']],
+                ['slug' => \Illuminate\Support\Str::slug($validated['category'])]
+            );
+
+            $auction->update([
+                'title'          => $validated['title'],
+                'description'    => $validated['description'],
+                'category_id'    => $categoryModel->id,
+                'condition'      => $validated['condition'] ?? null,
+                'artist'         => $validated['artist'] ?? null,
+                'year'           => $validated['year'] ?? null,
+                'starting_price' => $validated['starting_price'],
+                'current_price'  => $validated['starting_price'],
+                'bid_increment'  => $validated['bid_increment'],
+                'buy_now_price'  => $validated['buy_now_price'] ?? null,
+                'starts_at'      => $validated['starts_at'],
+                'ends_at'        => $validated['ends_at'],
+            ]);
+
+            // Reorder existing photos if photo_order is provided
+            if ($request->has('photo_order')) {
+                $order = $request->input('photo_order');
+                foreach ($order as $index => $imageId) {
+                    AuctionImage::where('id', $imageId)
+                        ->where('auction_id', $auction->id)
+                        ->update(['sort_order' => $index]);
+                }
+            }
+        });
+
+        $auction->load(['images', 'category']);
+
+        return response()->json([
+            'message' => 'Lelang berhasil diperbarui.',
+            'auction' => $this->transformAuction($auction),
+        ]);
     }
 
     /**

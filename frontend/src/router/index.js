@@ -59,7 +59,7 @@ const routes = [
     meta: { layout: "app", requiresAuth: true },
   },
   {
-    path: "/auction/:id/edit",
+    path: "/auction/edit/:id",
     name: "AuctionEdit",
     component: AuctionEditView,
     meta: { layout: "app", requiresAuth: true },
