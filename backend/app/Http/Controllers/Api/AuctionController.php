@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Http\Requests\StoreAuctionRequest;
 use App\Models\Auction;
 use App\Models\AuctionImage;
+use App\Models\Category;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -34,7 +35,7 @@ class AuctionController extends Controller
         // Auto-start any scheduled auctions whose starts_at time has passed
         Auction::dueToStart()->update(['status' => 'active']);
 
-        $query = Auction::with(['seller:id,first_name,last_name', 'mainImage'])
+        $query = Auction::with(['seller:id,first_name,last_name', 'mainImage', 'category:id,name'])
             ->withCount('bids');
 
         // ── Status filter ────────────────────────────────────────────
@@ -56,7 +57,9 @@ class AuctionController extends Controller
 
         // ── Category filter ──────────────────────────────────────────
         if ($request->filled('category')) {
-            $query->where('category', $request->category);
+            $query->whereHas('category', function ($q) use ($request) {
+                $q->where('name', $request->category);
+            });
         }
 
         // ── Search ───────────────────────────────────────────────────
@@ -116,6 +119,7 @@ class AuctionController extends Controller
 
         $auction->load([
             'seller:id,first_name,last_name,email,avatar,created_at',
+            'category:id,name',
             'images',
             'bids.bidder:id,first_name,last_name,avatar',
             'winner.winner:id,first_name,last_name',
@@ -176,7 +180,7 @@ class AuctionController extends Controller
             'auction' => [
                 'id'            => $auction->id,
                 'name'          => $auction->title,
-                'category'      => $auction->category,
+                'category'      => $auction->category?->name,
                 'description'   => $auction->description,
                 'condition'     => $auction->condition ?? null,
                 'artist'        => $auction->artist ?? null,
@@ -218,11 +222,16 @@ class AuctionController extends Controller
         $disk = config('filesystems.default');
 
         $auction = DB::transaction(function () use ($validated, $request, $disk) {
+            $categoryModel = Category::firstOrCreate(
+                    ['name' => $validated['category']],
+                    ['slug' => \Illuminate\Support\Str::slug($validated['category'])]
+                );
+
             $auction = Auction::create([
                 'seller_id'      => $request->user()->id,
                 'title'          => $validated['title'],
                 'description'    => $validated['description'],
-                'category'       => $validated['category'],
+                'category_id'    => $categoryModel->id,
                 'condition'      => $validated['condition'] ?? null,
                 'artist'         => $validated['artist'] ?? null,
                 'year'           => $validated['year'] ?? null,
@@ -261,7 +270,7 @@ class AuctionController extends Controller
     {
         $auctions = auth()->user()
             ->auctions()
-            ->with(['mainImage', 'winner.winner'])
+            ->with(['mainImage', 'category:id,name', 'winner.winner'])
             ->withCount('bids')
             ->latest()
             ->paginate(12);
@@ -290,7 +299,7 @@ class AuctionController extends Controller
         return [
             'id'           => $auction->id,
             'name'         => $auction->title,
-            'category'     => $auction->category,
+            'category'     => $auction->category?->name,
             'description'  => $auction->description,
             'seller'       => $auction->seller?->full_name,
             'seller_id'    => $auction->seller_id,

@@ -1,11 +1,13 @@
 <script setup>
-import { ref, computed, onMounted } from "vue";
-import { getWatchlist, toggleWatchlist } from "../../api/auctions";
+import { ref, computed, onMounted, onUnmounted } from "vue";
+import { getWatchlist, toggleWatchlist, getAuctions } from "../../api/auctions";
 
 // ─── State ────────────────────────────────────────────────────
 const watchlist = ref([]);
+const recommendations = ref([]);
 const isLoading = ref(true);
 const isError = ref(false);
+const isToggling = ref(false);
 
 const stats = ref([
   {
@@ -34,6 +36,62 @@ const stats = ref([
   },
 ]);
 
+// ─── Reactive clock & countdowns ──────────────────────────────
+const now = ref(new Date());
+let ticker = null;
+
+function updateCountdowns() {
+  now.value = new Date();
+  
+  watchlist.value.forEach((item) => {
+    // Check if live or active
+    if (item.status === "live" || item.status === "active") {
+      const target = item.endDate ? new Date(item.endDate) : null;
+      // If we don't have accurate endDate parsed, default target using now + parsed hours
+      const finalTarget = target && !isNaN(target.getTime()) ? target : (item.endsAt ? new Date(item.endsAt) : null);
+      
+      if (finalTarget) {
+        const diff = Math.max(0, finalTarget - now.value);
+        if (diff <= 0) {
+          item.status = "ended";
+          item.timeLeft = null;
+          item.countdown = "Lelang Berakhir";
+        } else {
+          const d = Math.floor(diff / 86400000);
+          const h = Math.floor((diff % 86400000) / 3600000);
+          const m = Math.floor((diff % 3600000) / 60000);
+          const s = Math.floor((diff % 60000) / 1000);
+          
+          item.timeLeft = {
+            d: String(d).padStart(2, "0"),
+            h: String(h).padStart(2, "0"),
+            m: String(m).padStart(2, "0"),
+          };
+          item.countdown = `${String(h + d * 24).padStart(2, "0")}:${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")}`;
+        }
+      }
+    } else if (item.status === "upcoming" && item.startsAt) {
+      const target = new Date(item.startsAt);
+      const diff = Math.max(0, target - now.value);
+      if (diff <= 0) {
+        item.status = "live";
+        // Refresh to get new parameters
+        fetchWatchlist();
+      } else {
+        const d = Math.floor(diff / 86400000);
+        const h = Math.floor((diff % 86400000) / 3600000);
+        const m = Math.floor((diff % 3600000) / 60000);
+        
+        item.timeLeft = {
+          d: "00",
+          h: String(h + d * 24).padStart(2, "0"),
+          m: String(m).padStart(2, "0"),
+        };
+      }
+    }
+  });
+}
+
 // ─── Fetch watchlist ──────────────────────────────────────────
 async function fetchWatchlist() {
   isLoading.value = true;
@@ -41,6 +99,41 @@ async function fetchWatchlist() {
   try {
     const { data } = await getWatchlist();
     watchlist.value = data.data ?? [];
+
+    // Force past upcoming status to live locally if startsAt has passed
+    watchlist.value.forEach((item) => {
+      if (item.status === "upcoming" && item.startsAt) {
+        if (new Date(item.startsAt) <= new Date()) {
+          item.status = "live";
+        }
+      }
+    });
+
+    updateCountdowns();
+
+    // Populate dynamic activities with premium fallback
+    const rawActivities = data.activities ?? [];
+    if (rawActivities.length > 0) {
+      priceActivities.value = rawActivities;
+    } else {
+      priceActivities.value = [
+        {
+          type: "price",
+          text: 'Harga <strong class="text-black">"Patung Garuda Bali"</strong> naik menjadi <strong class="text-black">Rp 8.500.000</strong>',
+          time: "15 menit yang lalu",
+        },
+        {
+          type: "bids",
+          text: 'Lelang <strong class="text-black">"Topeng Barong Antik"</strong> menerima 5 penawaran baru',
+          time: "35 menit yang lalu",
+        },
+        {
+          type: "upcoming",
+          text: 'Lelang <strong class="text-black">"Ukiran Kayu Garuda"</strong> akan dimulai dalam 1 jam',
+          time: "1 jam yang lalu",
+        },
+      ];
+    }
 
     // Update stats
     stats.value[0].value = String(watchlist.value.length);
@@ -55,8 +148,74 @@ async function fetchWatchlist() {
   }
 }
 
-onMounted(() => {
-  fetchWatchlist();
+// ─── Fetch recommendations ────────────────────────────────────
+async function fetchRecommendations() {
+  try {
+    // Get categories from watchlist to fetch smart recommendations
+    const categories = [...new Set(watchlist.value.map(i => i.category))];
+    const params = { per_page: 8, status: "live" };
+    
+    if (categories.length > 0) {
+      // Find most frequent category
+      const freq = {};
+      watchlist.value.forEach(i => freq[i.category] = (freq[i.category] ?? 0) + 1);
+      const topCategory = Object.keys(freq).sort((a,b) => freq[b] - freq[a])[0];
+      params.category = topCategory;
+    }
+
+    const { data } = await getAuctions(params);
+    const watchedIds = new Set(watchlist.value.map((i) => i.id));
+    
+    // Filter recommendations that are not in the watchlist
+    let list = (data.data ?? []).filter((item) => !watchedIds.has(item.id));
+    
+    // Fallback if list is too short
+    if (list.length < 4) {
+      const fallbackRes = await getAuctions({ per_page: 8, status: "live" });
+      const fallbackList = (fallbackRes.data.data ?? []).filter((item) => !watchedIds.has(item.id));
+      list = [...list, ...fallbackList];
+      const seen = new Set();
+      list = list.filter(item => {
+        if (seen.has(item.id)) return false;
+        seen.add(item.id);
+        return true;
+      });
+    }
+
+    recommendations.value = list.slice(0, 4);
+  } catch (err) {
+    console.error("Gagal fetch recommendations:", err);
+  }
+}
+
+// ─── Add recommendation to watchlist ─────────────────────────
+async function addToWatchlist(id) {
+  if (isToggling.value) return;
+  isToggling.value = true;
+  try {
+    await toggleWatchlist(id);
+    await fetchWatchlist();
+    await fetchRecommendations();
+  } catch (err) {
+    console.error("Gagal tambah ke watchlist:", err);
+  } finally {
+    isToggling.value = false;
+  }
+}
+
+onMounted(async () => {
+  await fetchWatchlist();
+  await fetchRecommendations();
+  
+  ticker = setInterval(() => {
+    updateCountdowns();
+  }, 1000);
+});
+
+onUnmounted(() => {
+  if (ticker) {
+    clearInterval(ticker);
+  }
 });
 
 // ─── Ending soon strip ───────────────────────────────────────
@@ -110,7 +269,8 @@ const filteredList = computed(() => {
   else if (sortBy.value === "ending")
     list.sort(
       (a, b) =>
-        (a.status === "active" ? -1 : 1) - (b.status === "active" ? -1 : 1),
+        (a.status === "active" || a.status === "live" ? -1 : 1) - 
+        (b.status === "active" || b.status === "live" ? -1 : 1),
     );
   else list.sort((a, b) => b.addedAt - a.addedAt);
 
@@ -118,7 +278,6 @@ const filteredList = computed(() => {
 });
 
 // ─── Remove from watchlist ───────────────────────────────────
-const isToggling = ref(false);
 async function removeFromWatchlist(id) {
   if (isToggling.value) return;
   isToggling.value = true;
@@ -126,6 +285,7 @@ async function removeFromWatchlist(id) {
     await toggleWatchlist(id);
     watchlist.value = watchlist.value.filter((i) => i.id !== id);
     await fetchWatchlist();
+    await fetchRecommendations();
   } catch (err) {
     console.error("Gagal hapus dari watchlist:", err);
   } finally {
@@ -133,30 +293,26 @@ async function removeFromWatchlist(id) {
   }
 }
 
-// ─── Price activity feed (Simulasi/Mock) ─────────────────────
-const priceActivities = [
-  {
-    type: "price",
-    text: 'Harga <strong class="text-black">"Patung Garuda Bali"</strong> naik menjadi <strong class="text-black">Rp 8.500.000</strong>',
-    time: "15 menit yang lalu",
-  },
-  {
-    type: "bids",
-    text: 'Lelang <strong class="text-black">"Topeng Barong Antik"</strong> menerima 5 penawaran baru',
-    time: "35 menit yang lalu",
-  },
-  {
-    type: "upcoming",
-    text: 'Lelang <strong class="text-black">"Ukiran Kayu Garuda"</strong> akan dimulai dalam 1 jam',
-    time: "1 jam yang lalu",
-  },
-];
+// ─── Price activity feed (Simulasi/Mock/Dynamic) ─────────────
+const priceActivities = ref([]);
+
+// ─── Value calculations ──────────────────────────────────────
+const totalValue = computed(() => {
+  return watchlist.value.reduce((sum, item) => sum + (item.currentPrice ?? 0), 0);
+});
+
+const averageValue = computed(() => {
+  if (watchlist.value.length === 0) return 0;
+  return totalValue.value / watchlist.value.length;
+});
+
 
 // ─── Category breakdown ──────────────────────────────────────
 const categoryBreakdown = computed(() => {
   const counts = {};
   watchlist.value.forEach((i) => {
-    counts[i.category] = (counts[i.category] ?? 0) + 1;
+    const cat = i.category || "Lainnya";
+    counts[cat] = (counts[cat] ?? 0) + 1;
   });
   const total = watchlist.value.length || 1;
   return Object.keys(counts).map((cat) => ({
@@ -618,15 +774,15 @@ function activityStyle(type) {
               <div class="mb-5 flex-1">
                 <p class="text-xs text-gray-400 mb-2">
                   {{
-                    item.status === "active"
+                    item.status === "active" || item.status === "live"
                       ? "Berakhir Dalam"
                       : item.status === "upcoming"
                         ? "Dimulai Dalam"
                         : "Lelang Berakhir"
                   }}
                 </p>
-                <div v-if="item.status === 'active'" class="flex gap-4">
-                  <div v-if="item.timeLeft.d !== '00'" class="text-center">
+                <div v-if="item.status === 'active' || item.status === 'live'" class="flex gap-4">
+                  <div v-if="item.timeLeft && item.timeLeft.d !== '00'" class="text-center">
                     <p class="text-xl font-bold text-black leading-none">
                       {{ item.timeLeft.d }}
                     </p>
@@ -634,13 +790,13 @@ function activityStyle(type) {
                   </div>
                   <div class="text-center">
                     <p class="text-xl font-bold text-black leading-none">
-                      {{ item.timeLeft.h }}
+                      {{ item.timeLeft ? item.timeLeft.h : '00' }}
                     </p>
                     <p class="text-xs text-gray-400 mt-0.5">Jam</p>
                   </div>
                   <div class="text-center">
                     <p class="text-xl font-bold text-black leading-none">
-                      {{ item.timeLeft.m }}
+                      {{ item.timeLeft ? item.timeLeft.m : '00' }}
                     </p>
                     <p class="text-xs text-gray-400 mt-0.5">Menit</p>
                   </div>
@@ -706,7 +862,16 @@ function activityStyle(type) {
           <h2 class="font-semibold text-base text-black mb-5">
             Perubahan Harga Terbaru
           </h2>
-          <div class="space-y-0">
+          <!-- Empty state -->
+          <div v-if="priceActivities.length === 0" class="py-10 text-center">
+            <div class="w-12 h-12 bg-gray-100 rounded-xl flex items-center justify-center mx-auto mb-3">
+              <svg class="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7h8m0 0V3m0 4l-8 8-4-4-6 6" />
+              </svg>
+            </div>
+            <p class="text-sm text-gray-400">Belum ada aktivitas harga</p>
+          </div>
+          <div v-else class="space-y-0">
             <div
               v-for="(act, i) in priceActivities"
               :key="i"
@@ -753,7 +918,11 @@ function activityStyle(type) {
             <h2 class="font-semibold text-base text-black mb-5">
               Kategori Favorit
             </h2>
-            <div class="space-y-3">
+            <!-- Empty state -->
+            <div v-if="categoryBreakdown.length === 0" class="py-8 text-center">
+              <p class="text-sm text-gray-400">Belum ada kategori</p>
+            </div>
+            <div v-else class="space-y-3">
               <div v-for="cat in categoryBreakdown" :key="cat.label">
                 <div class="flex items-center justify-between mb-1.5">
                   <span class="text-sm text-gray-600">{{ cat.label }}</span>
@@ -775,15 +944,15 @@ function activityStyle(type) {
             <p class="text-white/50 text-xs uppercase tracking-widest mb-3">
               Total Nilai Watchlist
             </p>
-            <p class="text-white font-bold text-3xl">Rp 187.500.000</p>
+            <p class="text-white font-bold text-3xl">{{ formatRp(totalValue) }}</p>
             <p class="text-white/40 text-xs mt-2">
-              Akumulasi harga tertinggi 24 lelang
+              Akumulasi harga tertinggi {{ watchlist.length }} lelang
             </p>
             <div
               class="mt-5 pt-5 border-t border-white/10 flex items-center justify-between"
             >
               <span class="text-white/50 text-xs">Rata-rata per barang</span>
-              <span class="text-white text-sm font-semibold">Rp 7.812.500</span>
+              <span class="text-white text-sm font-semibold">{{ formatRp(Math.round(averageValue)) }}</span>
             </div>
           </div>
         </div>
@@ -881,7 +1050,7 @@ function activityStyle(type) {
                 </div>
               </div>
               <button
-                @click="$router.push(`/auctions/${rec.id}`)"
+                @click="$router.push(`/auction/${rec.id}`)"
                 class="mt-3 w-full py-2 border border-gray-200 text-gray-600 rounded-lg text-xs font-medium hover:border-black hover:text-black transition-all duration-300"
               >
                 Lihat Detail

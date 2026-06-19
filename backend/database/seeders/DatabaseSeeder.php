@@ -32,5 +32,9 @@ class DatabaseSeeder extends Seeder
             'phone'      => '081234567890',
             'password'   => Hash::make('labs123'),
         ]);
+
+        DatabaseSeeder::call([
+            CategorySeeder::class,
+        ]);
     }
 }
