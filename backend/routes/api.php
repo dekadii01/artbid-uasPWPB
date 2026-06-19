@@ -66,6 +66,7 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::delete('auctions/{auction}', [AuctionController::class, 'destroy']);
 
     // Seller: daftar lelang milik sendiri beserta hasilnya
+    Route::get('my-auctions/dashboard', [AuctionController::class, 'dashboard']);
     Route::get('my-auctions', [AuctionController::class, 'myAuctions']);
 
     // ------------------------------------------------------------------

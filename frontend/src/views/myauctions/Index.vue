@@ -1,202 +1,187 @@
 <script setup>
-import { ref, computed } from "vue";
+import { ref, computed, onMounted, onUnmounted } from "vue";
+import { getMyAuctions, deleteAuction, getMyAuctionsDashboard } from "../../api/auctions";
 
-// ─── Stats ───────────────────────────────────────────────────
-const stats = [
+// ─── State ────────────────────────────────────────────────────
+const auctions = ref([]);
+const popularWorks = ref([]);
+const recentActivities = ref([]);
+const auctionResults = ref([]);
+const performance = ref({
+  totalEarnings: 0,
+  endedCount: 0,
+  avgPrice: 0,
+  avgBids: 0,
+});
+
+const isLoading = ref(true);
+const isError = ref(false);
+
+const statsData = ref({
+  total: 0,
+  active: 0,
+  upcoming: 0,
+  ended: 0,
+});
+
+// ─── Stats computed ───────────────────────────────────────────
+const stats = computed(() => [
   {
     label: "Total Lelang Dibuat",
-    value: "12",
+    value: String(statsData.value.total),
     icon: "M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2",
     dark: false,
   },
   {
     label: "Sedang Berlangsung",
-    value: "4",
+    value: String(statsData.value.active),
     icon: "M13 10V3L4 14h7v7l9-11h-7z",
     dark: true,
   },
   {
     label: "Akan Datang",
-    value: "3",
+    value: String(statsData.value.upcoming),
     icon: "M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z",
     dark: false,
   },
   {
     label: "Selesai",
-    value: "5",
+    value: String(statsData.value.ended),
     icon: "M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z",
     dark: false,
-  },
-];
-
-// ─── Popular works ───────────────────────────────────────────
-const popularWorks = ref([
-  {
-    id: 3,
-    name: "Topeng Barong Antik",
-    image:
-      "https://images.unsplash.com/photo-1567359781514-3b964e2b04d6?w=600&q=80",
-    currentPrice: 12500000,
-    totalBids: 52,
-    watching: 28,
-    badge: "Paling Banyak Ditawar",
-  },
-  {
-    id: 1,
-    name: "Lukisan Bali Klasik Tahun 1980",
-    image:
-      "https://images.unsplash.com/photo-1541701494587-cb58502866ab?w=600&q=80",
-    currentPrice: 8500000,
-    totalBids: 35,
-    watching: 42,
-    badge: "Paling Banyak Dilihat",
-  },
-  {
-    id: 2,
-    name: "Patung Garuda Bali",
-    image:
-      "https://images.unsplash.com/photo-1578926288207-32356f3e5e93?w=600&q=80",
-    currentPrice: 9200000,
-    totalBids: 29,
-    watching: 19,
-    badge: "Harga Tertinggi",
   },
 ]);
 
 // ─── Filters ─────────────────────────────────────────────────
-const filters = [
-  { label: "Semua", value: "all", count: 12 },
-  { label: "Akan Datang", value: "upcoming", count: 3 },
-  { label: "Sedang Berlangsung", value: "active", count: 4 },
-  { label: "Selesai", value: "ended", count: 5 },
-];
+const filters = computed(() => [
+  { label: "Semua", value: "all", count: statsData.value.total },
+  { label: "Akan Datang", value: "upcoming", count: statsData.value.upcoming },
+  { label: "Sedang Berlangsung", value: "active", count: statsData.value.active },
+  { label: "Selesai", value: "ended", count: statsData.value.ended },
+]);
 
 const activeFilter = ref("all");
 const search = ref("");
 const sortBy = ref("newest");
 
-// ─── Auction list ────────────────────────────────────────────
-const auctions = ref([
-  {
-    id: 1,
-    name: "Lukisan Bali Klasik Tahun 1980",
-    artist: "I Wayan Sukerta",
-    category: "Lukisan",
-    image:
-      "https://images.unsplash.com/photo-1541701494587-cb58502866ab?w=600&q=80",
-    startPrice: 5000000,
-    currentPrice: 8500000,
-    totalBids: 35,
-    watching: 42,
-    status: "active",
-    timeLeft: { d: "01", h: "06", m: "30" },
-    endDate: "",
-    createdAt: "1 Jun 2026",
-    addedAt: 1,
-  },
-  {
-    id: 2,
-    name: "Patung Garuda Bali",
-    artist: "Ketut Suardana",
-    category: "Patung",
-    image:
-      "https://images.unsplash.com/photo-1578926288207-32356f3e5e93?w=600&q=80",
-    startPrice: 6000000,
-    currentPrice: 9200000,
-    totalBids: 29,
-    watching: 19,
-    status: "active",
-    timeLeft: { d: "02", h: "04", m: "15" },
-    endDate: "",
-    createdAt: "3 Jun 2026",
-    addedAt: 2,
-  },
-  {
-    id: 3,
-    name: "Topeng Barong Antik",
-    artist: "Ni Luh Eka Sari",
-    category: "Kerajinan",
-    image:
-      "https://images.unsplash.com/photo-1567359781514-3b964e2b04d6?w=600&q=80",
-    startPrice: 4000000,
-    currentPrice: 12500000,
-    totalBids: 52,
-    watching: 28,
-    status: "active",
-    timeLeft: { d: "00", h: "02", m: "47" },
-    endDate: "",
-    createdAt: "5 Jun 2026",
-    addedAt: 3,
-  },
-  {
-    id: 4,
-    name: "Harmoni Semesta",
-    artist: "I Made Wijaya",
-    category: "Lukisan",
-    image:
-      "https://images.unsplash.com/photo-1460661419201-fd4cecdf8a8b?w=600&q=80",
-    startPrice: 8000000,
-    currentPrice: 8000000,
-    totalBids: 0,
-    watching: 0,
-    status: "upcoming",
-    timeLeft: { d: "02", h: "04", m: "15" },
-    endDate: "",
-    createdAt: "10 Jun 2026",
-    addedAt: 4,
-  },
-  {
-    id: 5,
-    name: "Sunrise Penida",
-    artist: "Agung Rai Photography",
-    category: "Fotografi",
-    image:
-      "https://images.unsplash.com/photo-1565193566173-7a0ee3dbe261?w=600&q=80",
-    startPrice: 3000000,
-    currentPrice: 3000000,
-    totalBids: 0,
-    watching: 0,
-    status: "upcoming",
-    timeLeft: { d: "03", h: "11", m: "00" },
-    endDate: "",
-    createdAt: "12 Jun 2026",
-    addedAt: 5,
-  },
-  {
-    id: 6,
-    name: "Dewi Kesuburan",
-    artist: "Ni Luh Eka Sari",
-    category: "Patung",
-    image:
-      "https://images.unsplash.com/photo-1513364776144-60967b0f800f?w=600&q=80",
-    startPrice: 7000000,
-    currentPrice: 15000000,
-    totalBids: 48,
-    watching: 0,
-    status: "ended",
-    timeLeft: null,
-    endDate: "9 Juni 2026",
-    createdAt: "28 Mei 2026",
-    addedAt: 6,
-  },
-  {
-    id: 7,
-    name: "Alam Tak Terbatas",
-    artist: "Sang Ayu Putu Riani",
-    category: "Lukisan Batik",
-    image:
-      "https://images.unsplash.com/photo-1578301978018-3005759f48f7?w=600&q=80",
-    startPrice: 9500000,
-    currentPrice: 18200000,
-    totalBids: 41,
-    watching: 0,
-    status: "ended",
-    timeLeft: null,
-    endDate: "5 Juni 2026",
-    createdAt: "20 Mei 2026",
-    addedAt: 7,
-  },
-]);
+// ─── Drafts ──────────────────────────────────────────────────
+const drafts = ref([]);
+
+function loadDrafts() {
+  try {
+    const raw = localStorage.getItem("artbid_drafts");
+    drafts.value = raw ? JSON.parse(raw) : [];
+  } catch (err) {
+    console.error("Gagal load drafts:", err);
+    drafts.value = [];
+  }
+}
+
+function deleteDraft(id) {
+  drafts.value = drafts.value.filter((d) => d.id !== id);
+  localStorage.setItem("artbid_drafts", JSON.stringify(drafts.value));
+}
+
+// ─── Reactive countdown timer ─────────────────────────────────
+const now = ref(new Date());
+let ticker = null;
+
+function updateCountdowns() {
+  now.value = new Date();
+  
+  auctions.value.forEach((auction) => {
+    if (auction.status === "active" || auction.status === "live") {
+      const target = auction.endsAt ? new Date(auction.endsAt) : null;
+      if (target && !isNaN(target.getTime())) {
+        const diff = Math.max(0, target - now.value);
+        if (diff <= 0) {
+          auction.status = "ended";
+          auction.timeLeft = null;
+        } else {
+          const d = Math.floor(diff / 86400000);
+          const h = Math.floor((diff % 86400000) / 3600000);
+          const m = Math.floor((diff % 3600000) / 60000);
+          
+          auction.timeLeft = {
+            d: String(d).padStart(2, "0"),
+            h: String(h).padStart(2, "0"),
+            m: String(m).padStart(2, "0"),
+          };
+        }
+      }
+    } else if (auction.status === "upcoming" && auction.startsAt) {
+      const target = new Date(auction.startsAt);
+      const diff = Math.max(0, target - now.value);
+      if (diff <= 0) {
+        auction.status = "active";
+        fetchData(true); // Silent reload
+      } else {
+        const d = Math.floor(diff / 86400000);
+        const h = Math.floor((diff % 86400000) / 3600000);
+        const m = Math.floor((diff % 3600000) / 60000);
+        
+        auction.timeLeft = {
+          d: String(d).padStart(2, "0"),
+          h: String(h).padStart(2, "0"),
+          m: String(m).padStart(2, "0"),
+        };
+      }
+    }
+  });
+}
+
+// ─── Fetch data from API ──────────────────────────────────────
+async function fetchData(isSilent = false) {
+  if (!isSilent) isLoading.value = true;
+  isError.value = false;
+  try {
+    // 1. Fetch dashboard stats & lists
+    const dashboardRes = await getMyAuctionsDashboard();
+    statsData.value = dashboardRes.data.stats;
+    popularWorks.value = dashboardRes.data.popularWorks;
+    recentActivities.value = dashboardRes.data.recentActivities;
+    auctionResults.value = dashboardRes.data.auctionResults;
+    performance.value = dashboardRes.data.performance;
+
+    // 2. Fetch all seller's auctions
+    const auctionsRes = await getMyAuctions({ per_page: 100 });
+    const rawList = auctionsRes.data.data ?? [];
+    
+    // Map dates & init timeLeft
+    rawList.forEach((a) => {
+      if (a.endsAt) {
+        const dateObj = new Date(a.endsAt);
+        a.endDate = dateObj.toLocaleDateString("id-ID", {
+          day: "numeric",
+          month: "long",
+          year: "numeric",
+        });
+      }
+      a.timeLeft = { d: "00", h: "00", m: "00" };
+    });
+
+    auctions.value = rawList;
+    updateCountdowns();
+  } catch (err) {
+    console.error("Gagal memuat data lelang saya:", err);
+    isError.value = true;
+  } finally {
+    if (!isSilent) isLoading.value = false;
+  }
+}
+
+onMounted(async () => {
+  await fetchData();
+  loadDrafts();
+  
+  ticker = setInterval(() => {
+    updateCountdowns();
+  }, 1000);
+});
+
+onUnmounted(() => {
+  if (ticker) clearInterval(ticker);
+});
 
 // ─── Filtered list ───────────────────────────────────────────
 const filteredAuctions = computed(() => {
@@ -206,9 +191,9 @@ const filteredAuctions = computed(() => {
     const q = search.value.toLowerCase();
     list = list.filter(
       (a) =>
-        a.name.toLowerCase().includes(q) ||
-        a.category.toLowerCase().includes(q) ||
-        a.artist.toLowerCase().includes(q),
+        (a.name && a.name.toLowerCase().includes(q)) ||
+        (a.category && a.category.toLowerCase().includes(q)) ||
+        (a.artist && a.artist.toLowerCase().includes(q)),
     );
   }
 
@@ -216,22 +201,28 @@ const filteredAuctions = computed(() => {
     list = list.filter((a) => a.status === activeFilter.value);
   }
 
-  if (sortBy.value === "oldest") list.sort((a, b) => b.addedAt - a.addedAt);
-  else if (sortBy.value === "price_high")
+  // Sort
+  if (sortBy.value === "oldest") {
+    list.sort((a, b) => new Date(a.createdAt) - new Date(b.createdAt));
+  } else if (sortBy.value === "newest") {
+    list.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+  } else if (sortBy.value === "price_high") {
     list.sort((a, b) => b.currentPrice - a.currentPrice);
-  else if (sortBy.value === "most_bids")
+  } else if (sortBy.value === "most_bids") {
     list.sort((a, b) => b.totalBids - a.totalBids);
-  else if (sortBy.value === "ending")
-    list.sort(
-      (a, b) =>
-        (a.status === "active" ? -1 : 1) - (b.status === "active" ? -1 : 1),
-    );
-  else if (sortBy.value === "starting")
-    list.sort(
-      (a, b) =>
-        (a.status === "upcoming" ? -1 : 1) - (b.status === "upcoming" ? -1 : 1),
-    );
-  else list.sort((a, b) => a.addedAt - b.addedAt);
+  } else if (sortBy.value === "ending") {
+    list.sort((a, b) => {
+      if (a.status === "active" && b.status !== "active") return -1;
+      if (a.status !== "active" && b.status === "active") return 1;
+      return new Date(a.endsAt) - new Date(b.endsAt);
+    });
+  } else if (sortBy.value === "starting") {
+    list.sort((a, b) => {
+      if (a.status === "upcoming" && b.status !== "upcoming") return -1;
+      if (a.status !== "upcoming" && b.status === "upcoming") return 1;
+      return new Date(a.startsAt) - new Date(b.startsAt);
+    });
+  }
 
   return list;
 });
@@ -243,87 +234,33 @@ function confirmDelete(auction) {
   deleteTarget.value = auction;
 }
 
-function handleDelete() {
+async function handleDelete() {
   if (!deleteTarget.value) return;
-  auctions.value = auctions.value.filter((a) => a.id !== deleteTarget.value.id);
-  deleteTarget.value = null;
+  try {
+    await deleteAuction(deleteTarget.value.id);
+    await fetchData();
+  } catch (err) {
+    console.error("Gagal menghapus lelang:", err);
+    alert(err.response?.data?.message || "Gagal menghapus lelang.");
+  } finally {
+    deleteTarget.value = null;
+  }
 }
-
-// ─── Drafts ──────────────────────────────────────────────────
-const drafts = ref([
-  {
-    id: "d1",
-    name: "Lukisan Tradisional Bali",
-    image:
-      "https://images.unsplash.com/photo-1460661419201-fd4cecdf8a8b?w=100&q=80",
-  },
-  {
-    id: "d2",
-    name: "Ukiran Kayu Kecak",
-    image:
-      "https://images.unsplash.com/photo-1513364776144-60967b0f800f?w=100&q=80",
-  },
-]);
-
-function deleteDraft(id) {
-  drafts.value = drafts.value.filter((d) => d.id !== id);
-}
-
-// ─── Recent activities ───────────────────────────────────────
-const recentActivities = [
-  {
-    type: "bid",
-    text: 'Penawaran baru sebesar <strong class="text-black">Rp 8.500.000</strong> pada <strong class="text-black">"Lukisan Bali Klasik Tahun 1980"</strong>',
-    time: "5 menit yang lalu",
-  },
-  {
-    type: "newbidder",
-    text: 'Lelang <strong class="text-black">"Patung Garuda Bali"</strong> mendapatkan penawar baru',
-    time: "15 menit yang lalu",
-  },
-  {
-    type: "ended",
-    text: 'Lelang <strong class="text-black">"Topeng Barong Antik"</strong> telah berakhir dengan harga akhir <strong class="text-black">Rp 12.500.000</strong>',
-    time: "1 jam yang lalu",
-  },
-  {
-    type: "bid",
-    text: 'Penawaran baru sebesar <strong class="text-black">Rp 12.500.000</strong> pada <strong class="text-black">"Topeng Barong Antik"</strong>',
-    time: "2 jam yang lalu",
-  },
-  {
-    type: "newbidder",
-    text: 'Lelang <strong class="text-black">"Harmoni Semesta"</strong> ditambahkan ke watchlist oleh 5 pengguna baru',
-    time: "3 jam yang lalu",
-  },
-];
-
-// ─── Auction results ─────────────────────────────────────────
-const auctionResults = [
-  {
-    id: 6,
-    name: "Dewi Kesuburan",
-    finalPrice: 15000000,
-    winner: "I Putu Arya",
-    totalBids: 48,
-  },
-  {
-    id: 7,
-    name: "Alam Tak Terbatas",
-    finalPrice: 18200000,
-    winner: "Budi Santoso",
-    totalBids: 41,
-  },
-];
 
 // ─── Helpers ─────────────────────────────────────────────────
 function formatRp(val) {
+  if (val === null || val === undefined) return "Rp 0";
   return "Rp " + val.toLocaleString("id-ID");
 }
 
 function statusStyle(status) {
   const map = {
     active: {
+      wrapper: "bg-gray-50 border-gray-200 text-gray-800",
+      dot: "bg-gray-800",
+      label: "Sedang Berlangsung",
+    },
+    live: {
       wrapper: "bg-gray-50 border-gray-200 text-gray-800",
       dot: "bg-gray-800",
       label: "Sedang Berlangsung",
@@ -857,7 +794,7 @@ function activityStyle(type) {
                       <!-- Upcoming -->
                       <template v-if="auction.status === 'upcoming'">
                         <button
-                          @click="$router.push(`/auctions/${auction.id}`)"
+                          @click="$router.push(`/auction/${auction.id}`)"
                           class="px-4 py-2 border border-gray-200 text-gray-600 rounded-lg text-xs font-medium hover:border-black hover:text-black transition-all duration-300"
                         >
                           Lihat Detail
@@ -905,7 +842,7 @@ function activityStyle(type) {
                       <!-- Active -->
                       <template v-else-if="auction.status === 'active'">
                         <button
-                          @click="$router.push(`/auctions/${auction.id}`)"
+                          @click="$router.push(`/auction/${auction.id}`)"
                           class="px-4 py-2 bg-black text-white rounded-lg text-xs font-medium hover:bg-gray-800 transition-all duration-300"
                         >
                           Lihat Detail
@@ -916,7 +853,7 @@ function activityStyle(type) {
                       <template v-else>
                         <button
                           @click="
-                            $router.push(`/auctions/${auction.id}/result`)
+                            $router.push(`/auction/${auction.id}`)
                           "
                           class="px-4 py-2 border border-gray-200 text-gray-600 rounded-lg text-xs font-medium hover:border-black hover:text-black transition-all duration-300"
                         >
@@ -1078,7 +1015,7 @@ function activityStyle(type) {
                   </div>
                 </div>
                 <button
-                  @click="$router.push(`/auctions/${result.id}/result`)"
+                  @click="$router.push(`/auction/${result.id}`)"
                   class="w-full py-2 border border-gray-200 text-gray-600 rounded-lg text-xs font-medium hover:border-black hover:text-black transition-all duration-300"
                 >
                   Lihat Detail Hasil
@@ -1092,20 +1029,20 @@ function activityStyle(type) {
             <p class="text-white/50 text-xs uppercase tracking-widest mb-3">
               Total Pendapatan
             </p>
-            <p class="text-white font-bold text-3xl">Rp 72.500.000</p>
+            <p class="text-white font-bold text-3xl">{{ formatRp(performance.totalEarnings) }}</p>
             <p class="text-white/40 text-xs mt-2">
-              Dari 5 lelang yang telah selesai
+              Dari {{ performance.endedCount }} lelang yang telah selesai
             </p>
             <div
               class="mt-5 pt-5 border-t border-white/10 grid grid-cols-2 gap-4"
             >
               <div>
                 <p class="text-white/40 text-xs mb-1">Rata-rata harga</p>
-                <p class="text-white text-sm font-semibold">Rp 14.500.000</p>
+                <p class="text-white text-sm font-semibold">{{ formatRp(performance.avgPrice) }}</p>
               </div>
               <div>
                 <p class="text-white/40 text-xs mb-1">Rata-rata bid</p>
-                <p class="text-white text-sm font-semibold">34 Bid</p>
+                <p class="text-white text-sm font-semibold">{{ performance.avgBids }} Bid</p>
               </div>
             </div>
           </div>

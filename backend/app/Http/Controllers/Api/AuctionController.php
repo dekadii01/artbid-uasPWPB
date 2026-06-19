@@ -12,6 +12,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
+use App\Models\Bid;
 
 class AuctionController extends Controller
 {
@@ -36,7 +37,7 @@ class AuctionController extends Controller
         Auction::dueToStart()->update(['status' => 'active']);
 
         $query = Auction::with(['seller:id,first_name,last_name', 'mainImage', 'category:id,name'])
-            ->withCount('bids');
+            ->withCount(['bids', 'watchers']);
 
         // ── Status filter ────────────────────────────────────────────
         // Map status dari frontend ke backend
@@ -271,7 +272,7 @@ class AuctionController extends Controller
         $auctions = auth()->user()
             ->auctions()
             ->with(['mainImage', 'category:id,name', 'winner.winner'])
-            ->withCount('bids')
+            ->withCount(['bids', 'watchers'])
             ->latest()
             ->paginate(12);
 
@@ -299,6 +300,7 @@ class AuctionController extends Controller
         return [
             'id'           => $auction->id,
             'name'         => $auction->title,
+            'artist'       => $auction->artist,
             'category'     => $auction->category?->name,
             'description'  => $auction->description,
             'seller'       => $auction->seller?->full_name,
@@ -306,6 +308,8 @@ class AuctionController extends Controller
             'currentPrice' => (float) $auction->current_price,
             'startPrice'   => (float) $auction->starting_price,
             'bidCount'     => $auction->bids_count ?? 0,
+            'totalBids'    => $auction->bids_count ?? 0,
+            'watching'     => $auction->watchers_count ?? 0,
             'photoCount'   => $auction->images_count ?? 1,
             'image'        => $mainImageUrl,
             'status'       => $statusMap[$auction->status] ?? $auction->status,
@@ -330,6 +334,195 @@ class AuctionController extends Controller
             'image_path'   => $path,
             'storage_disk' => $disk,
             'sort_order'   => $sortOrder,
+        ]);
+    }
+
+    /**
+     * Hapus lelang (hanya jika status = scheduled dan milik sendiri).
+     */
+    public function destroy(Auction $auction): JsonResponse
+    {
+        // Pastikan lelang milik user yang sedang login
+        if ($auction->seller_id !== auth()->id()) {
+            return response()->json(['message' => 'Unauthorized.'], 403);
+        }
+
+        // Hanya boleh dihapus jika status scheduled
+        if ($auction->status !== 'scheduled') {
+            return response()->json(['message' => 'Lelang hanya dapat dihapus sebelum dimulai.'], 422);
+        }
+
+        // Hapus file gambar jika ada
+        foreach ($auction->images as $img) {
+            Storage::disk($img->storage_disk)->delete($img->image_path);
+            $img->delete();
+        }
+
+        $auction->delete();
+
+        return response()->json([
+            'message' => 'Lelang berhasil dihapus.',
+        ]);
+    }
+
+    /**
+     * Dashboard statistik, popular works, ended results, performance data, & recent activities.
+     */
+    public function dashboard(Request $request): JsonResponse
+    {
+        $user = $request->user();
+        $sellerAuctionIds = $user->auctions()->pluck('id');
+
+        // 1. Stats
+        $stats = [
+            'total'     => $user->auctions()->count(),
+            'active'    => $user->auctions()->where('status', 'active')->count(),
+            'upcoming'  => $user->auctions()->where('status', 'scheduled')->count(),
+            'ended'     => $user->auctions()->where('status', 'ended')->count(),
+        ];
+
+        // 2. Popular Works (Top 3)
+        $allAuctions = $user->auctions()
+            ->with(['mainImage', 'category:id,name'])
+            ->withCount(['bids', 'watchers'])
+            ->get();
+
+        $popularWorks = [];
+
+        // - Paling Banyak Ditawar
+        $p1 = $allAuctions->sortByDesc('bids_count')->first();
+        if ($p1) {
+            $popularWorks[] = [
+                'id'           => $p1->id,
+                'name'         => $p1->title,
+                'image'        => $p1->mainImage?->url ?? 'https://images.unsplash.com/photo-1579783902614-a3fb3927b6a5?w=600&q=80',
+                'currentPrice' => (float) $p1->current_price,
+                'totalBids'    => $p1->bids_count,
+                'watching'     => $p1->watchers_count,
+                'badge'        => 'Paling Banyak Ditawar',
+            ];
+        }
+
+        // - Paling Banyak Dilihat (Watched)
+        $p2 = $allAuctions->where('id', '!=', $p1?->id)->sortByDesc('watchers_count')->first();
+        if ($p2) {
+            $popularWorks[] = [
+                'id'           => $p2->id,
+                'name'         => $p2->title,
+                'image'        => $p2->mainImage?->url ?? 'https://images.unsplash.com/photo-1579783902614-a3fb3927b6a5?w=600&q=80',
+                'currentPrice' => (float) $p2->current_price,
+                'totalBids'    => $p2->bids_count,
+                'watching'     => $p2->watchers_count,
+                'badge'        => 'Paling Banyak Dilihat',
+            ];
+        }
+
+        // - Harga Tertinggi
+        $p3 = $allAuctions->whereNotIn('id', array_filter([$p1?->id, $p2?->id]))->sortByDesc('current_price')->first();
+        if ($p3) {
+            $popularWorks[] = [
+                'id'           => $p3->id,
+                'name'         => $p3->title,
+                'image'        => $p3->mainImage?->url ?? 'https://images.unsplash.com/photo-1579783902614-a3fb3927b6a5?w=600&q=80',
+                'currentPrice' => (float) $p3->current_price,
+                'totalBids'    => $p3->bids_count,
+                'watching'     => $p3->watchers_count,
+                'badge'        => 'Harga Tertinggi',
+            ];
+        }
+
+        // 3. Recent Activities (from Bids & Ends)
+        $recentBids = Bid::whereIn('auction_id', $sellerAuctionIds)
+            ->with(['bidder', 'auction'])
+            ->latest()
+            ->limit(10)
+            ->get();
+
+        $activities = [];
+        foreach ($recentBids as $bid) {
+            $isFirstBid = !Bid::where('auction_id', $bid->auction_id)
+                ->where('id', '<', $bid->id)
+                ->exists();
+
+            $timeDiff = $bid->created_at->diffForHumans();
+
+            if ($isFirstBid) {
+                $activities[] = [
+                    'type' => 'newbidder',
+                    'text' => 'Lelang <strong class="text-black">"' . e($bid->auction->title) . '"</strong> mendapatkan penawar baru',
+                    'time' => $timeDiff,
+                    'timestamp' => $bid->created_at->timestamp,
+                ];
+            }
+
+            $activities[] = [
+                'type' => 'bid',
+                'text' => 'Penawaran baru sebesar <strong class="text-black">Rp ' . number_format($bid->amount, 0, ',', '.') . '</strong> pada <strong class="text-black">"' . e($bid->auction->title) . '"</strong>',
+                'time' => $timeDiff,
+                'timestamp' => $bid->created_at->timestamp,
+            ];
+        }
+
+        // Ambil lelang yang baru selesai
+        $endedAuctions = $user->auctions()
+            ->where('status', 'ended')
+            ->latest('ends_at')
+            ->limit(5)
+            ->get();
+
+        foreach ($endedAuctions as $auction) {
+            $timeDiff = ($auction->ends_at ?? $auction->updated_at)->diffForHumans();
+            $activities[] = [
+                'type' => 'ended',
+                'text' => 'Lelang <strong class="text-black">"' . e($auction->title) . '"</strong> telah berakhir dengan harga akhir <strong class="text-black">Rp ' . number_format($auction->current_price, 0, ',', '.') . '</strong>',
+                'time' => $timeDiff,
+                'timestamp' => ($auction->ends_at ?? $auction->updated_at)->timestamp,
+            ];
+        }
+
+        // Sort combined activities by timestamp DESC
+        usort($activities, fn($a, $b) => $b['timestamp'] <=> $a['timestamp']);
+        $activities = array_slice($activities, 0, 8); // top 8
+
+        // 4. Ended Auction Results
+        $auctionResults = $user->auctions()
+            ->where('status', 'ended')
+            ->with(['winner.winner'])
+            ->withCount('bids')
+            ->latest('ends_at')
+            ->limit(5)
+            ->get()
+            ->map(fn($a) => [
+                'id'         => $a->id,
+                'name'       => $a->title,
+                'finalPrice' => (float) ($a->winner?->final_price ?? $a->current_price),
+                'winner'     => $a->winner?->winner?->full_name ?? '—',
+                'totalBids'  => $a->bids_count,
+            ]);
+
+        // 5. Performance
+        $totalEarnings = (float) DB::table('auction_winners')
+            ->whereIn('auction_id', $sellerAuctionIds)
+            ->sum('final_price');
+
+        $endedCount = $user->auctions()->where('status', 'ended')->count();
+        $endedWithBids = $user->auctions()->where('status', 'ended')->withCount('bids')->get();
+        $avgBids = $endedCount > 0 ? (int) round($endedWithBids->avg('bids_count')) : 0;
+        $avgPrice = $endedCount > 0 ? (float) $endedWithBids->avg('current_price') : 0;
+
+        $performance = [
+            'totalEarnings' => $totalEarnings,
+            'endedCount'    => $endedCount,
+            'avgPrice'      => $avgPrice,
+            'avgBids'       => $avgBids,
+        ];
+
+        return response()->json([
+            'stats'            => $stats,
+            'popularWorks'     => $popularWorks,
+            'recentActivities' => $activities,
+            'auctionResults'   => $auctionResults,
+            'performance'      => $performance,
         ]);
     }
 }
