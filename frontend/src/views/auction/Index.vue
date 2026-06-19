@@ -3,8 +3,10 @@ import { ref, computed, onMounted, onUnmounted, watch } from "vue";
 import { useRouter } from "vue-router";
 import Navbar from "../../components/Appnavbar.vue";
 import { getAuctions } from "../../api/auctions";
+import { useAuthStore } from "../../stores/auth";
 
 const router = useRouter();
+const authStore = useAuthStore();
 
 // ─── Helpers ─────────────────────────────────────────────────────
 function formatRupiah(value) {
@@ -677,14 +679,14 @@ const goToAuction = (id) => router.push(`/auction/${id}`);
                   @click="goToAuction(auction.id)"
                   class="w-full py-2.5 bg-black text-white rounded-lg text-sm font-medium hover:bg-gray-800 transition-colors"
                 >
-                  Tawar Sekarang
+                  {{ authStore.user && authStore.user.id === auction.seller_id ? "Lelang Saya" : "Tawar Sekarang" }}
                 </button>
                 <button
                   v-else-if="auction.status === 'upcoming'"
                   @click="goToAuction(auction.id)"
                   class="w-full py-2.5 border border-black text-black rounded-lg text-sm font-medium hover:bg-black hover:text-white transition-colors"
                 >
-                  Lihat Detail
+                  {{ authStore.user && authStore.user.id === auction.seller_id ? "Lelang Saya" : "Lihat Detail" }}
                 </button>
                 <button
                   v-else

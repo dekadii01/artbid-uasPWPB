@@ -1048,7 +1048,7 @@ const relatedAuctions = ref([]);
               </p>
 
               <!-- Quick bid -->
-              <div class="flex gap-2 mb-3">
+              <div v-if="!(authStore.user && authStore.user.id === auction.seller?.id)" class="flex gap-2 mb-3">
                 <button
                   v-for="inc in quickBidIncrements"
                   :key="inc"
@@ -1068,8 +1068,9 @@ const relatedAuctions = ref([]);
                   v-model="bidAmount"
                   type="number"
                   :placeholder="minBid"
+                  :disabled="authStore.user && authStore.user.id === auction.seller?.id"
                   :class="[
-                    'w-full pl-10 pr-4 py-3 border rounded-xl text-sm font-semibold focus:outline-none transition-colors',
+                    'w-full pl-10 pr-4 py-3 border rounded-xl text-sm font-semibold focus:outline-none transition-colors disabled:opacity-50 disabled:bg-gray-50',
                     bidError
                       ? 'border-red-300 bg-red-50 text-red-700'
                       : 'border-gray-200 focus:border-black',
@@ -1090,15 +1091,18 @@ const relatedAuctions = ref([]);
                 {{ bidError }}
               </p>
               <p v-else class="text-xs text-gray-400 mb-3">
-                Minimal penawaran:
-                <span class="font-semibold text-gray-600">{{
-                  formatRupiah(minBid)
-                }}</span>
+                <span v-if="authStore.user && authStore.user.id === auction.seller?.id">Anda tidak dapat menawar lelang sendiri</span>
+                <span v-else>
+                  Minimal penawaran:
+                  <span class="font-semibold text-gray-600">{{
+                    formatRupiah(minBid)
+                  }}</span>
+                </span>
               </p>
 
               <button
                 @click="placeBid"
-                :disabled="isBidding"
+                :disabled="isBidding || (authStore.user && authStore.user.id === auction.seller?.id)"
                 class="w-full py-3.5 bg-black text-white rounded-xl text-sm font-semibold hover:bg-gray-800 transition-colors disabled:opacity-60 disabled:cursor-not-allowed flex items-center justify-center gap-2"
               >
                 <svg
@@ -1121,7 +1125,7 @@ const relatedAuctions = ref([]);
                     d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"
                   />
                 </svg>
-                {{ isBidding ? "Memproses..." : "Tawar Sekarang" }}
+                {{ isBidding ? "Memproses..." : (authStore.user && authStore.user.id === auction.seller?.id ? "Lelang Saya" : "Tawar Sekarang") }}
               </button>
             </div>
 
@@ -1192,7 +1196,8 @@ const relatedAuctions = ref([]);
             </p>
             <button
               @click="showBuyNowModal = true"
-              class="w-full py-3 border-2 border-black text-black rounded-xl text-sm font-semibold hover:bg-black hover:text-white transition-all duration-200 flex items-center justify-center gap-2"
+              :disabled="authStore.user && authStore.user.id === auction.seller?.id"
+              class="w-full py-3 border-2 border-black text-black rounded-xl text-sm font-semibold hover:bg-black hover:text-white transition-all duration-200 flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-white disabled:hover:text-black"
             >
               Beli Sekarang
             </button>
