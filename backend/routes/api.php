@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\Api\Admin\AuctionController as AdminAuctionController;
 use App\Http\Controllers\Api\Admin\UserController as AdminUserController;
+use App\Http\Controllers\Api\Admin\ReportController;
 use App\Http\Controllers\Api\AuctionController;
 use App\Http\Controllers\Api\AuctionImageController;
 use App\Http\Controllers\Api\AuctionWinnerController;
@@ -125,5 +126,9 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::put('categories/{category}',         [CategoryController::class, 'update']);
         Route::post('categories/{category}',        [CategoryController::class, 'update']); // untuk multipart/form-data
         Route::delete('categories/{category}',      [CategoryController::class, 'destroy']);
+
+        // Admin Reports
+        Route::get('reports',                       [ReportController::class, 'index']);
+        Route::get('reports/export',                [ReportController::class, 'export']);
     });
 });
