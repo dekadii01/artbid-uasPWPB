@@ -254,9 +254,12 @@ function applyServerErrors(serverErrors) {
   };
 
   const mapped = {};
-  for (const [serverField, localField] of Object.entries(map)) {
-    if (serverErrors[serverField]) {
-      mapped[localField] = serverErrors[serverField][0];
+  for (const [serverField, messages] of Object.entries(serverErrors)) {
+    if (map[serverField]) {
+      mapped[map[serverField]] = messages[0];
+    } else {
+      // Log unmapped errors agar terlihat di console saat debugging
+      console.warn(`[422] Unmapped validation error — ${serverField}:`, messages);
     }
   }
   errors.value = { ...errors.value, ...mapped };

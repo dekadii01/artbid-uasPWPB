@@ -34,7 +34,8 @@ class StoreAuctionRequest extends FormRequest
             'buy_now_price'   => ['nullable', 'numeric', 'gt:starting_price'],
 
             // ── Jadwal ───────────────────────────────────────────────
-            'starts_at'   => ['required', 'date', 'after_or_equal:now'],
+            // Toleransi 5 menit agar tidak gagal karena delay network/form-fill
+            'starts_at'   => ['required', 'date', 'after_or_equal:starts_at_threshold'],
             'ends_at'     => ['required', 'date', 'after:starts_at'],
         ];
     }
@@ -68,6 +69,10 @@ class StoreAuctionRequest extends FormRequest
      *
      * Frontend mengirim: start_date, start_time, end_date, end_time (terpisah)
      * Kita butuh: starts_at, ends_at (datetime gabungan)
+     *
+     * Juga menambahkan starts_at_threshold (now - 5 menit) sebagai batas
+     * toleransi waktu agar validasi 'after_or_equal' tidak gagal karena
+     * delay jaringan atau waktu pengisian form.
      */
     protected function prepareForValidation(): void
     {
@@ -81,8 +86,11 @@ class StoreAuctionRequest extends FormRequest
             $merge['ends_at'] = $this->end_date . ' ' . $this->end_time . ':00';
         }
 
-        if (!empty($merge)) {
-            $this->merge($merge);
-        }
+        // Toleransi 5 menit ke belakang agar form tidak gagal
+        // jika user memilih waktu "sekarang" lalu butuh beberapa menit untuk submit
+        $merge['starts_at_threshold'] = now()->subMinutes(5)->format('Y-m-d H:i:s');
+
+        $this->merge($merge);
     }
 }
+
