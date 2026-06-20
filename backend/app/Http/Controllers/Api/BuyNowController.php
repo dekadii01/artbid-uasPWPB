@@ -14,7 +14,28 @@ use Illuminate\Support\Facades\DB;
 class BuyNowController extends Controller
 {
     /**
-     * Lakukan Buy Now untuk memenangkan lelang secara instan.
+     * @group Buy Now
+     * @authenticated
+     *
+     * Lakukan Buy Now untuk memenangkan lelang secara instan (Buyer).
+     *
+     * @urlParam auction integer required ID lelang. Example: 1
+     *
+     * @response 201 {
+     *   "message": "Lelang berhasil dibeli langsung.",
+     *   "winner": {
+     *     "id": 1,
+     *     "auction_id": 1,
+     *     "winner_id": 3,
+     *     "winning_bid_id": 15,
+     *     "final_price": 20000000.0,
+     *     "created_at": "2026-06-20T14:30:00.000000Z",
+     *     "updated_at": "2026-06-20T14:30:00.000000Z"
+     *   }
+     * }
+     * @response 422 {
+     *   "message": "Fitur Buy Now tidak tersedia untuk lelang ini."
+     * }
      */
     public function store(Request $request, Auction $auction): JsonResponse
     {

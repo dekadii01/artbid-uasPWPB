@@ -18,7 +18,33 @@ class CategoryController extends Controller
 {
     //
     /**
+     * @group Categories
+     *
      * Menampilkan daftar semua kategori lelang (Publik).
+     *
+     * @response 200 [
+     *   {
+     *     "id": 1,
+     *     "name": "Lukisan",
+     *     "slug": "lukisan",
+     *     "description": "Koleksi lukisan seni Bali dan modern",
+     *     "icon": "M4 6a2 2 0 012-2...",
+     *     "image": "http://localhost:8000/storage/categories/lukisan.png",
+     *     "totalAuctions": 125,
+     *     "totalBids": 2350,
+     *     "totalSellers": 58,
+     *     "createdAt": "20 Jun 2026",
+     *     "updatedAt": "20 Jun 2026",
+     *     "recentItems": [
+     *       {
+     *         "name": "Lukisan Bali Klasik",
+     *         "seller": "Ketut Wirawan",
+     *         "status": "active",
+     *         "price": 12500000
+     *       }
+     *     ]
+     *   }
+     * ]
      */
     public function index(Request $request): JsonResponse
     {
@@ -103,7 +129,24 @@ class CategoryController extends Controller
         return response()->json($data);
     }
     /**
+     * @group Categories
+     *
      * Menampilkan satu detail kategori lelang (Publik).
+     *
+     * @urlParam category integer required ID atau slug kategori. Example: 1
+     *
+     * @response 200 {
+     *   "category": {
+     *     "id": 1,
+     *     "name": "Lukisan",
+     *     "slug": "lukisan",
+     *     "description": "Koleksi lukisan seni Bali dan modern",
+     *     "icon": "M4 6a2 2 0 012-2...",
+     *     "image": "http://localhost:8000/storage/categories/lukisan.png",
+     *     "createdAt": "20 Jun 2026",
+     *     "updatedAt": "20 Jun 2026"
+     *   }
+     * }
      */
     public function show(Category $category): JsonResponse
     {
@@ -121,7 +164,29 @@ class CategoryController extends Controller
         ]);
     }
     /**
+     * @group Admin Categories
+     * @authenticated
+     *
      * Menyimpan kategori lelang baru ke database (Hanya Admin).
+     *
+     * @bodyParam name string required Nama kategori (harus unik). Example: Kerajinan Kayu
+     * @bodyParam description string Deskripsi kategori. Example: Aneka seni ukir kayu khas Bali
+     * @bodyParam icon string Ikon SVG. Example: M4 6a2 2 0...
+     * @bodyParam image file Gambar thumbnail kategori (format jpg, jpeg, png, webp, max 2MB).
+     *
+     * @response 201 {
+     *   "message": "Kategori berhasil ditambahkan.",
+     *   "category": {
+     *     "id": 5,
+     *     "name": "Kerajinan Kayu",
+     *     "slug": "kerajinan-kayu",
+     *     "description": "Aneka seni ukir kayu khas Bali",
+     *     "icon": "M4 6a2 2 0...",
+     *     "image_path": "categories/kerajinan-kayu.png",
+     *     "created_at": "2026-06-20T13:53:12.000000Z",
+     *     "updated_at": "2026-06-20T13:53:12.000000Z"
+     *   }
+     * }
      */
     public function store(StoreCategoryRequest $request): JsonResponse
     {
@@ -142,7 +207,30 @@ class CategoryController extends Controller
         ], 201);
     }
     /**
+     * @group Admin Categories
+     * @authenticated
+     *
      * Memperbarui kategori lelang yang sudah ada (Hanya Admin).
+     *
+     * @urlParam category integer required ID kategori. Example: 1
+     * @bodyParam name string required Nama kategori (harus unik). Example: Lukisan Bali
+     * @bodyParam description string Deskripsi kategori. Example: Lukisan khas Bali dan sekitarnya
+     * @bodyParam icon string Ikon SVG. Example: M4 6a2 2 0...
+     * @bodyParam image file Gambar thumbnail kategori baru (format jpg, jpeg, png, webp, max 2MB).
+     *
+     * @response 200 {
+     *   "message": "Kategori berhasil diperbarui.",
+     *   "category": {
+     *     "id": 1,
+     *     "name": "Lukisan Bali",
+     *     "slug": "lukisan-bali",
+     *     "description": "Lukisan khas Bali dan sekitarnya",
+     *     "icon": "M4 6a2 2 0...",
+     *     "image_path": "categories/lukisan-bali.png",
+     *     "created_at": "2026-06-20T13:53:12.000000Z",
+     *     "updated_at": "2026-06-20T13:53:12.000000Z"
+     *   }
+     * }
      */
     public function update(UpdateCategoryRequest $request, Category $category): JsonResponse
     {
@@ -167,7 +255,19 @@ class CategoryController extends Controller
         ]);
     }
     /**
+     * @group Admin Categories
+     * @authenticated
+     *
      * Menghapus kategori lelang dari database (Hanya Admin).
+     *
+     * @urlParam category integer required ID kategori. Example: 1
+     *
+     * @response 200 {
+     *   "message": "Kategori berhasil dihapus."
+     * }
+     * @response 400 {
+     *   "message": "Kategori tidak dapat dihapus karena sedang digunakan oleh 5 barang lelang."
+     * }
      */
     public function destroy(Category $category): JsonResponse
     {

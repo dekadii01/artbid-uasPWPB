@@ -16,8 +16,24 @@ use Illuminate\Http\Request;
 class SettingController extends Controller
 {
     /**
-     * Mengambil seluruh pengaturan sistem dari database.
-     * Mengembalikan response JSON berisi daftar pasangan key dan value.
+     * @group Admin Settings
+     * @authenticated
+     *
+     * Mengambil seluruh pengaturan sistem dari database (Admin).
+     *
+     * @response 200 {
+     *   "message": "Pengaturan sistem berhasil dimuat.",
+     *   "settings": {
+     *     "umum": {
+     *       "nama_situs": "ArtBid",
+     *       "logo": "logo.png"
+     *     },
+     *     "lelang": {
+     *       "komisi": 8,
+     *       "durasi_maksimal": 7
+     *     }
+     *   }
+     * }
      */
     public function index(): JsonResponse
     {
@@ -39,8 +55,17 @@ class SettingController extends Controller
     }
 
     /**
-     * Memperbarui atau menyimpan data pengaturan sistem ke database.
-     * Mendukung pembaruan satu grup maupun pembaruan massal (simpan semua).
+     * @group Admin Settings
+     * @authenticated
+     *
+     * Memperbarui atau menyimpan data pengaturan sistem (Admin).
+     *
+     * @bodyParam key string Kunci grup pengaturan (jika ingin update grup tunggal). Example: umum
+     * @bodyParam value object Nilai/data grup pengaturan.
+     *
+     * @response 200 {
+     *   "message": "Pengaturan sistem berhasil disimpan."
+     * }
      */
     public function update(Request $request): JsonResponse
     {

@@ -13,9 +13,27 @@ use Illuminate\Support\Str;
 class AuctionImageController extends Controller
 {
     /**
-     * Tambah foto baru ke lelang yang sudah ada.
-     * Hanya seller pemilik lelang yang boleh menambah foto,
-     * dan hanya selama lelang belum dimulai (status scheduled).
+     * @group Auction Images
+     * @authenticated
+     *
+     * Tambah foto baru ke lelang yang sudah ada (Seller).
+     *
+     * @urlParam auction integer required ID lelang. Example: 10
+     * @bodyParam photos file[] required Array file foto tambahan (format jpg, jpeg, png, webp, max 10MB per file).
+     *
+     * @response 201 {
+     *   "message": "Foto berhasil ditambahkan.",
+     *   "images": [
+     *     {
+     *       "id": 16,
+     *       "auction_id": 10,
+     *       "image_path": "auctions/10/extra1.png",
+     *       "storage_disk": "public",
+     *       "sort_order": 1,
+     *       "url": "http://localhost:8000/storage/auctions/10/extra1.png"
+     *     }
+     *   ]
+     * }
      */
     public function store(Request $request, Auction $auction): JsonResponse
     {
@@ -67,7 +85,17 @@ class AuctionImageController extends Controller
     }
 
     /**
-     * Hapus satu foto dari lelang.
+     * @group Auction Images
+     * @authenticated
+     *
+     * Hapus satu foto dari lelang (Seller).
+     *
+     * @urlParam auction integer required ID lelang. Example: 10
+     * @urlParam image integer required ID foto lelang. Example: 16
+     *
+     * @response 200 {
+     *   "message": "Foto berhasil dihapus."
+     * }
      */
     public function destroy(Request $request, Auction $auction, AuctionImage $image): JsonResponse
     {

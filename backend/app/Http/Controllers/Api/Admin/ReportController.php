@@ -16,7 +16,14 @@ use Illuminate\Support\Facades\DB;
 class ReportController extends Controller
 {
     /**
-     * Get report data based on period.
+     * @group Admin Reports
+     * @authenticated
+     *
+     * Get report data based on period (Admin).
+     *
+     * @queryParam period string Filter periode (today, week, month, year, custom). Default: month. Example: month
+     * @queryParam date_from date Format YYYY-MM-DD (wajib jika period=custom). Example: 2026-06-01
+     * @queryParam date_to date Format YYYY-MM-DD (wajib jika period=custom). Example: 2026-06-30
      */
     public function index(Request $request): JsonResponse
     {
@@ -263,7 +270,15 @@ class ReportController extends Controller
     }
 
     /**
-     * Export reports to CSV.
+     * @group Admin Reports
+     * @authenticated
+     *
+     * Export reports to CSV (Admin).
+     *
+     * @queryParam type string Jenis data yang diekspor (users, auctions, bids, transactions, categories, all). Default: all. Example: users
+     * @queryParam period string Filter periode (today, week, month, year, custom). Default: month. Example: month
+     * @queryParam date_from date Format YYYY-MM-DD (wajib jika period=custom). Example: 2026-06-01
+     * @queryParam date_to date Format YYYY-MM-DD (wajib jika period=custom). Example: 2026-06-30
      */
     public function export(Request $request)
     {

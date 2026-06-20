@@ -15,10 +15,25 @@ use Illuminate\Support\Facades\Storage;
 class ProfileController extends Controller
 {
     /**
+     * @group Profile
+     * @authenticated
+     *
      * Ambil data profil user yang sedang login.
      *
-     * GET /api/profile
-     * Requires: auth:sanctum
+     * @response 200 {
+     *   "user": {
+     *     "id": 1,
+     *     "first_name": "Budi",
+     *     "last_name": "Setiawan",
+     *     "email": "budi.setiawan@example.com",
+     *     "phone": "08123456789",
+     *     "role": "user",
+     *     "status": "active",
+     *     "avatar": "avatars/sample.png",
+     *     "created_at": "2026-06-20T13:53:12.000000Z",
+     *     "updated_at": "2026-06-20T13:53:12.000000Z"
+     *   }
+     * }
      */
     public function show(Request $request): JsonResponse
     {
@@ -29,13 +44,35 @@ class ProfileController extends Controller
     }
 
     /**
-     * Update data profil user yang sedang login (bisa dipanggil oleh admin maupun user biasa).
+     * @group Profile
+     * @authenticated
      *
-     * PUT /api/profile
-     * Requires: auth:sanctum
-     * 
-     * @param UpdateProfileRequest $request
-     * @return JsonResponse
+     * Update data profil user yang sedang login.
+     *
+     * @bodyParam firstName string Nama depan user. Example: Budi
+     * @bodyParam lastName string Nama belakang user. Example: Setiawan
+     * @bodyParam email string Email user. Example: budi.setiawan@example.com
+     * @bodyParam phone string Nomor telepon. Example: 08123456789
+     * @bodyParam password string Password baru (minimal 8 karakter). Example: rahasia123
+     * @bodyParam password_confirmation string Konfirmasi password baru. Example: rahasia123
+     * @bodyParam avatar file File foto profil / avatar baru (format jpeg, png, jpg, gif, max 2MB).
+     * @bodyParam role string Role user (hanya admin yang dapat mengubah ini). Example: user
+     *
+     * @response 200 {
+     *   "message": "Profil berhasil diperbarui.",
+     *   "user": {
+     *     "id": 1,
+     *     "first_name": "Budi",
+     *     "last_name": "Setiawan",
+     *     "email": "budi.setiawan@example.com",
+     *     "phone": "08123456789",
+     *     "role": "user",
+     *     "status": "active",
+     *     "avatar": "avatars/new_avatar.png",
+     *     "created_at": "2026-06-20T13:53:12.000000Z",
+     *     "updated_at": "2026-06-20T13:53:12.000000Z"
+     *   }
+     * }
      */
     public function update(UpdateProfileRequest $request): JsonResponse
     {
