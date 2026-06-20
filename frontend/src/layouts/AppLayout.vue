@@ -10,8 +10,8 @@
 
 <script setup>
 import { useRoute } from "vue-router";
-import AppNavbar from "../components/AppNavbar.vue";
-import Footer from "../components/Thefooter.vue";
+import AppNavbar from "../components/Appnavbar.vue";
+import Footer from "../components/TheFooter.vue";
 import { computed } from "vue";
 
 const route = useRoute();

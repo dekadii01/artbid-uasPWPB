@@ -13,7 +13,7 @@
 
 <script setup>
 import { ref, computed, provide } from "vue";
-import AdminSidebar from "../components/admin/AdminSidebar.vue";
+import AdminSidebar from "../components/admin/Adminsidebar.vue";
 import AdminTopbar from "../components/admin/AdminTopbar.vue";
 
 const collapsed = ref(false);
