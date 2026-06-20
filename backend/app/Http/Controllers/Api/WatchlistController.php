@@ -11,7 +11,52 @@ use Illuminate\Http\Request;
 class WatchlistController extends Controller
 {
     /**
+     * @group Watchlist
+     * @authenticated
+     *
      * Get paginated watchlist for authenticated user.
+     *
+     * @response 200 {
+     *   "current_page": 1,
+     *   "data": [
+     *     {
+     *       "id": 1,
+     *       "name": "Lukisan Bali Klasik",
+     *       "artist": "Ketut Wirawan",
+     *       "category": "Lukisan",
+     *       "image": "http://localhost:8000/storage/auctions/1/main.png",
+     *       "currentPrice": 12500000.0,
+     *       "totalBids": 3,
+     *       "watching": 10,
+     *       "hasBid": true,
+     *       "status": "live",
+     *       "timeLeft": {
+     *         "d": "02",
+     *         "h": "04",
+     *         "m": "35"
+     *       },
+     *       "endDate": "27 Jun 2026",
+     *       "addedAt": 1782012015
+     *     }
+     *   ],
+     *   "first_page_url": "http://localhost:8000/api/watchlist?page=1",
+     *   "from": 1,
+     *   "last_page": 1,
+     *   "last_page_url": "http://localhost:8000/api/watchlist?page=1",
+     *   "next_page_url": null,
+     *   "path": "http://localhost:8000/api/watchlist",
+     *   "per_page": 12,
+     *   "prev_page_url": null,
+     *   "to": 1,
+     *   "total": 1,
+     *   "activities": [
+     *     {
+     *       "type": "price",
+     *       "text": "Penawaran baru pada <strong>\"Lukisan Bali Klasik\"</strong> naik menjadi <strong>Rp 12.500.000</strong>",
+     *       "time": "5 menit yang lalu"
+     *     }
+     *   ]
+     * }
      */
     public function index(Request $request): JsonResponse
     {
@@ -99,7 +144,17 @@ class WatchlistController extends Controller
     }
 
     /**
+     * @group Watchlist
+     * @authenticated
+     *
      * Toggle watchlist status for an auction.
+     *
+     * @urlParam auction integer required ID lelang. Example: 1
+     *
+     * @response 200 {
+     *   "watchlisted": true,
+     *   "message": "Ditambahkan ke watchlist."
+     * }
      */
     public function store(Request $request, Auction $auction): JsonResponse
     {

@@ -13,6 +13,9 @@ use Illuminate\Support\Facades\Storage;
 class UserController extends Controller
 {
     /**
+     * @group Admin Users
+     * @authenticated
+     *
      * Tampilkan daftar seluruh pengguna beserta statistiknya (Admin).
      */
     public function index(Request $request): JsonResponse
@@ -138,15 +141,33 @@ class UserController extends Controller
     }
 
     /**
-     * Update data profil pengguna lain.
-     * Hanya dapat diakses oleh user dengan role 'admin'.
+     * @group Admin Users
+     * @authenticated
      *
-     * PUT /api/admin/users/{user}
-     * Requires: auth:sanctum, admin (EnsureUserIsAdmin)
+     * Update data profil pengguna lain (Admin).
      *
-     * @param Request $request
-     * @param User $user Model Binding otomatis berdasarkan ID user di URL
-     * @return JsonResponse
+     * @urlParam user integer required ID user yang akan diupdate. Example: 3
+     * @bodyParam firstName string Nama depan. Example: Wayan
+     * @bodyParam lastName string Nama belakang. Example: Sudiarta
+     * @bodyParam email string Email user. Example: wayan@example.com
+     * @bodyParam phone string Nomor telepon. Example: 08123456788
+     * @bodyParam password string Password baru. Example: rahasia123
+     * @bodyParam role string Role ('admin' atau 'user'). Example: user
+     * @bodyParam status string Status ('active' atau 'blocked'). Example: active
+     * @bodyParam avatar file File avatar baru (max 2MB).
+     *
+     * @response 200 {
+     *   "message": "Profil pengguna berhasil diperbarui oleh Admin.",
+     *   "user": {
+     *     "id": 3,
+     *     "first_name": "Wayan",
+     *     "last_name": "Sudiarta",
+     *     "email": "wayan@example.com",
+     *     "phone": "08123456788",
+     *     "role": "user",
+     *     "status": "active"
+     *   }
+     * }
      */
     public function update(Request $request, User $user): JsonResponse
     {
@@ -251,9 +272,12 @@ class UserController extends Controller
     }
 
     /**
-     * Tampilkan detail pengguna (Admin).
-     * 
-     * GET /api/admin/users/{user}
+     * @group Admin Users
+     * @authenticated
+     *
+     * Tampilkan detail pengguna beserta seluruh riwayat aktivitasnya (Admin).
+     *
+     * @urlParam user integer required ID user. Example: 3
      */
     public function show(User $user): JsonResponse
     {
@@ -476,9 +500,19 @@ class UserController extends Controller
     }
 
     /**
+     * @group Admin Users
+     * @authenticated
+     *
      * Hapus akun pengguna secara permanen (Admin).
-     * 
-     * DELETE /api/admin/users/{user}
+     *
+     * @urlParam user integer required ID user. Example: 3
+     *
+     * @response 200 {
+     *   "message": "Akun pengguna berhasil dihapus secara permanen."
+     * }
+     * @response 400 {
+     *   "message": "Anda tidak dapat menghapus akun Anda sendiri."
+     * }
      */
     public function destroy(User $user): JsonResponse
     {

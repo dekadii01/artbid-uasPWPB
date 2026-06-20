@@ -17,9 +17,32 @@ use Illuminate\Support\Str;
 class AuthController extends Controller
 {
     /**
+     * @group Authentication
+     *
      * Register a new user.
      *
-     * POST /api/auth/register
+     * @bodyParam firstName string required Nama depan user. Example: Budi
+     * @bodyParam lastName string required Nama belakang user. Example: Setiawan
+     * @bodyParam email string required Email user (harus unik). Example: budi.setiawan@example.com
+     * @bodyParam phone string required Nomor telepon. Example: 08123456789
+     * @bodyParam password string required Password (minimal 8 karakter). Example: rahasia123
+     * @bodyParam password_confirmation string required Konfirmasi password. Example: rahasia123
+     *
+     * @response 201 {
+     *   "message": "Registrasi berhasil.",
+     *   "user": {
+     *     "id": 1,
+     *     "first_name": "Budi",
+     *     "last_name": "Setiawan",
+     *     "email": "budi.setiawan@example.com",
+     *     "phone": "08123456789",
+     *     "role": "user",
+     *     "status": "active",
+     *     "created_at": "2026-06-20T13:53:12.000000Z",
+     *     "updated_at": "2026-06-20T13:53:12.000000Z"
+     *   },
+     *   "token": "1|abcdef123456..."
+     * }
      */
     public function register(RegisterRequest $request): JsonResponse
     {
@@ -41,9 +64,34 @@ class AuthController extends Controller
     }
 
     /**
+     * @group Authentication
+     *
      * Authenticate user and issue a Sanctum token.
      *
-     * POST /api/auth/login
+     * @bodyParam email string required Email user. Example: budi.setiawan@example.com
+     * @bodyParam password string required Password. Example: rahasia123
+     *
+     * @response 200 {
+     *   "message": "Login berhasil.",
+     *   "user": {
+     *     "id": 1,
+     *     "first_name": "Budi",
+     *     "last_name": "Setiawan",
+     *     "email": "budi.setiawan@example.com",
+     *     "phone": "08123456789",
+     *     "role": "user",
+     *     "status": "active",
+     *     "created_at": "2026-06-20T13:53:12.000000Z",
+     *     "updated_at": "2026-06-20T13:53:12.000000Z"
+     *   },
+     *   "token": "2|ghijk789012..."
+     * }
+     * @response 401 {
+     *   "message": "Email atau password salah."
+     * }
+     * @response 403 {
+     *   "message": "Akun Anda telah diblokir oleh administrator."
+     * }
      */
     public function login(LoginRequest $request): JsonResponse
     {
@@ -77,10 +125,14 @@ class AuthController extends Controller
     }
 
     /**
+     * @group Authentication
+     * @authenticated
+     *
      * Revoke the current token (logout).
      *
-     * POST /api/auth/logout
-     * Requires: auth:sanctum
+     * @response 200 {
+     *   "message": "Logout berhasil."
+     * }
      */
     public function logout(Request $request): JsonResponse
     {
@@ -93,9 +145,9 @@ class AuthController extends Controller
     }
 
     /**
-     * Redirect the user to the Google authentication page.
+     * @group Authentication
      *
-     * GET /api/auth/google/redirect
+     * Redirect the user to the Google authentication page.
      */
     public function redirectToGoogle()
     {
@@ -103,9 +155,9 @@ class AuthController extends Controller
     }
 
     /**
-     * Obtain the user information from Google and login/register.
+     * @group Authentication
      *
-     * GET /api/auth/google/callback
+     * Obtain the user information from Google and login/register.
      */
     public function handleGoogleCallback()
     {

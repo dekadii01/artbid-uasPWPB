@@ -18,19 +18,52 @@ use App\Models\Bid;
 class AuctionController extends Controller
 {
     /**
+     * @group Auctions
+     *
      * Daftar lelang (publik, tidak perlu login).
      *
-     * Query params yang didukung:
-     *   ?status=active|scheduled|ended   → filter per status
-     *   ?category=Lukisan                → filter per kategori
-     *   ?search=keyword                  → cari judul/deskripsi
-     *   ?sort=latest|price_high|price_low|ending_soon|most_bids
-     *   ?per_page=12
+     * @queryParam status string Filter status lelang (live, upcoming, ended, all). Example: live
+     * @queryParam category string Filter nama kategori lelang. Example: Lukisan
+     * @queryParam search string Cari judul atau deskripsi lelang. Example: Bali
+     * @queryParam sort string Pengurutan lelang (latest, price_high, price_low, ending_soon, most_bids). Example: latest
+     * @queryParam per_page integer Jumlah item per halaman (default 12, max 50). Example: 12
      *
-     * Frontend pakai status:
-     *   "live"     → backend: "active"
-     *   "upcoming" → backend: "scheduled"
-     *   "ended"    → backend: "ended"
+     * @response 200 {
+     *   "current_page": 1,
+     *   "data": [
+     *     {
+     *       "id": 1,
+     *       "name": "Lukisan Bali Klasik",
+     *       "artist": "Ketut Wirawan",
+     *       "category": "Lukisan",
+     *       "description": "Lukisan pemandangan tradisional Bali...",
+     *       "seller": "I Putu",
+     *       "seller_id": 2,
+     *       "currentPrice": 12500000.0,
+     *       "startPrice": 10000000.0,
+     *       "bidCount": 3,
+     *       "totalBids": 3,
+     *       "watching": 10,
+     *       "photoCount": 2,
+     *       "image": "http://localhost:8000/storage/auctions/1/sample.png",
+     *       "status": "live",
+     *       "startsAt": "2026-06-20T10:00:00Z",
+     *       "endsAt": "2026-06-27T10:00:00Z",
+     *       "createdAt": "2026-06-20T08:00:00Z"
+     *     }
+     *   ],
+     *   "first_page_url": "http://localhost:8000/api/auctions?page=1",
+     *   "from": 1,
+     *   "last_page": 1,
+     *   "last_page_url": "http://localhost:8000/api/auctions?page=1",
+     *   "next_page_url": null,
+     *   "path": "http://localhost:8000/api/auctions",
+     *   "per_page": 12,
+     *   "prev_page_url": null,
+     *   "to": 1,
+     *   "total": 1,
+     *   "today_bids_count": 5
+     * }
      */
     public function index(Request $request): JsonResponse
     {
@@ -110,11 +143,58 @@ class AuctionController extends Controller
     }
 
     /**
+     * @group Auctions
+     *
      * Detail satu lelang (publik).
-     */
-    /**
-     * Detail satu lelang (publik).
-     * GET /api/auctions/{id}
+     *
+     * @urlParam auction integer required ID lelang. Example: 1
+     *
+     * @response 200 {
+     *   "auction": {
+     *     "id": 1,
+     *     "name": "Lukisan Bali Klasik",
+     *     "category": "Lukisan",
+     *     "description": "Lukisan pemandangan tradisional Bali...",
+     *     "condition": "Sangat Baik",
+     *     "artist": "Ketut Wirawan",
+     *     "year": 2020,
+     *     "status": "live",
+     *     "startPrice": 10000000.0,
+     *     "currentPrice": 12500000.0,
+     *     "minIncrement": 500000.0,
+     *     "buyNowPrice": 20000000.0,
+     *     "startsAt": "2026-06-20T10:00:00Z",
+     *     "endsAt": "2026-06-27T10:00:00Z",
+     *     "createdAt": "2026-06-20T08:00:00Z",
+     *     "isWatchlisted": false,
+     *     "images": [
+     *       {
+     *         "id": 1,
+     *         "url": "http://localhost:8000/storage/auctions/1/sample.png",
+     *         "sortOrder": 0
+     *       }
+     *     ],
+     *     "seller": {
+     *       "id": 2,
+     *       "name": "Ketut Wirawan",
+     *       "email": "ketut@example.com",
+     *       "avatar": null,
+     *       "joinedAt": "2026-06-19T08:00:00Z"
+     *     },
+     *     "bids": [
+     *       {
+     *         "id": 3,
+     *         "user": "Wayan***",
+     *         "avatar": "https://i.pravatar.cc/32?u=3",
+     *         "amount": 12500000.0,
+     *         "time": "14:20:15",
+     *         "status": "active"
+     *       }
+     *     ],
+     *     "bidCount": 1,
+     *     "winner": null
+     *   }
+     * }
      */
     public function show(Auction $auction): JsonResponse
     {
@@ -220,7 +300,59 @@ class AuctionController extends Controller
     }
 
     /**
-     * Buat lelang baru beserta upload foto.
+     * @group Auctions
+     * @authenticated
+     *
+     * Buat lelang baru beserta upload foto (Seller).
+     *
+     * @bodyParam title string required Judul barang lelang. Example: Lukisan Barong
+     * @bodyParam category string required Nama kategori lelang. Example: Lukisan
+     * @bodyParam description string required Deskripsi detail barang lelang (minimal 30 karakter). Example: Lukisan Barong dengan gaya klasik cat minyak di atas kanvas, ukuran 100x120cm.
+     * @bodyParam condition string required Kondisi barang. Example: Sangat Baik
+     * @bodyParam artist string Artis / Pembuat karya seni. Example: Ida Bagus
+     * @bodyParam year integer Tahun pembuatan karya seni. Example: 2021
+     * @bodyParam starting_price numeric required Harga awal lelang (Rp). Example: 5000000
+     * @bodyParam bid_increment numeric required Kelipatan penawaran minimum (Rp). Example: 250000
+     * @bodyParam buy_now_price numeric Harga beli langsung (Rp, opsional). Example: 10000000
+     * @bodyParam start_date date required Tanggal mulai lelang (YYYY-MM-DD). Example: 2026-06-21
+     * @bodyParam start_time string required Waktu mulai lelang (HH:MM). Example: 10:00
+     * @bodyParam end_date date required Tanggal berakhir lelang (YYYY-MM-DD). Example: 2026-06-28
+     * @bodyParam end_time string required Waktu berakhir lelang (HH:MM). Example: 10:00
+     * @bodyParam main_photo file required Foto utama barang lelang (format jpg, jpeg, png, webp, max 10MB).
+     * @bodyParam extra_photos file[] Array foto tambahan (maksimal 5 foto, format jpg, jpeg, png, webp, max 10MB).
+     *
+     * @response 201 {
+     *   "message": "Lelang berhasil dibuat.",
+     *   "auction": {
+     *     "id": 10,
+     *     "seller_id": 2,
+     *     "title": "Lukisan Barong",
+     *     "description": "Lukisan Barong dengan gaya klasik cat minyak...",
+     *     "category_id": 1,
+     *     "condition": "Sangat Baik",
+     *     "artist": "Ida Bagus",
+     *     "year": 2021,
+     *     "starting_price": "5000000.00",
+     *     "current_price": "5000000.00",
+     *     "bid_increment": "250000.00",
+     *     "buy_now_price": "10000000.00",
+     *     "status": "scheduled",
+     *     "starts_at": "2026-06-21T10:00:00.000000Z",
+     *     "ends_at": "2026-06-28T10:00:00.000000Z",
+     *     "created_at": "2026-06-20T13:53:12.000000Z",
+     *     "updated_at": "2026-06-20T13:53:12.000000Z",
+     *     "images": [
+     *       {
+     *         "id": 15,
+     *         "auction_id": 10,
+     *         "image_path": "auctions/10/main.png",
+     *         "storage_disk": "public",
+     *         "sort_order": 0,
+     *         "url": "http://localhost:8000/storage/auctions/10/main.png"
+     *       }
+     *     ]
+     *   }
+     * }
      */
     public function store(StoreAuctionRequest $request): JsonResponse
     {
@@ -270,7 +402,49 @@ class AuctionController extends Controller
     }
 
     /**
-     * Update lelang (hanya jika status = scheduled dan milik sendiri).
+     * @group Auctions
+     * @authenticated
+     *
+     * Update lelang (hanya jika status = scheduled dan milik sendiri / admin).
+     *
+     * @urlParam auction integer required ID lelang. Example: 10
+     * @bodyParam title string required Judul barang lelang. Example: Lukisan Barong
+     * @bodyParam category string required Nama kategori lelang. Example: Lukisan
+     * @bodyParam description string required Deskripsi detail barang lelang (minimal 30 karakter). Example: Lukisan Barong dengan gaya klasik cat minyak di atas kanvas, ukuran 100x120cm.
+     * @bodyParam condition string required Kondisi barang. Example: Sangat Baik
+     * @bodyParam artist string Pembuat karya seni. Example: Ida Bagus
+     * @bodyParam year integer Tahun pembuatan karya seni. Example: 2021
+     * @bodyParam starting_price numeric required Harga awal lelang (Rp). Example: 5000000
+     * @bodyParam bid_increment numeric required Kelipatan penawaran minimum (Rp). Example: 250000
+     * @bodyParam buy_now_price numeric Harga beli langsung (Rp, opsional). Example: 10000000
+     * @bodyParam start_date date required Tanggal mulai lelang (YYYY-MM-DD). Example: 2026-06-21
+     * @bodyParam start_time string required Waktu mulai lelang (HH:MM). Example: 10:00
+     * @bodyParam end_date date required Tanggal berakhir lelang (YYYY-MM-DD). Example: 2026-06-28
+     * @bodyParam end_time string required Waktu berakhir lelang (HH:MM). Example: 10:00
+     * @bodyParam photo_order int[] Susunan ID foto yang ada (opsional). Example: [15, 16]
+     *
+     * @response 200 {
+     *   "message": "Lelang berhasil diperbarui.",
+     *   "auction": {
+     *     "id": 10,
+     *     "name": "Lukisan Barong",
+     *     "artist": "Ida Bagus",
+     *     "category": "Lukisan",
+     *     "description": "Lukisan Barong dengan gaya klasik cat minyak...",
+     *     "seller": "Ketut Wirawan",
+     *     "seller_id": 2,
+     *     "currentPrice": 5000000.0,
+     *     "startPrice": 5000000.0,
+     *     "bidCount": 0,
+     *     "totalBids": 0,
+     *     "watching": 0,
+     *     "photoCount": 1,
+     *     "image": "http://localhost:8000/storage/auctions/10/main.png",
+     *     "status": "upcoming",
+     *     "startsAt": "2026-06-21T10:00:00Z",
+     *     "endsAt": "2026-06-28T10:00:00Z"
+     *   }
+     * }
      */
     public function update(UpdateAuctionRequest $request, Auction $auction): JsonResponse
     {
@@ -327,7 +501,45 @@ class AuctionController extends Controller
     }
 
     /**
+     * @group Auctions
+     * @authenticated
+     *
      * Lelang milik seller yang sedang login.
+     *
+     * @response 200 {
+     *   "current_page": 1,
+     *   "data": [
+     *     {
+     *       "id": 10,
+     *       "name": "Lukisan Barong",
+     *       "artist": "Ida Bagus",
+     *       "category": "Lukisan",
+     *       "description": "Lukisan Barong dengan gaya klasik...",
+     *       "seller": "Ketut Wirawan",
+     *       "seller_id": 2,
+     *       "currentPrice": 5000000.0,
+     *       "startPrice": 5000000.0,
+     *       "bidCount": 0,
+     *       "totalBids": 0,
+     *       "watching": 0,
+     *       "photoCount": 1,
+     *       "image": "http://localhost:8000/storage/auctions/10/main.png",
+     *       "status": "upcoming",
+     *       "startsAt": "2026-06-21T10:00:00Z",
+     *       "endsAt": "2026-06-28T10:00:00Z"
+     *     }
+     *   ],
+     *   "first_page_url": "http://localhost:8000/api/my-auctions?page=1",
+     *   "from": 1,
+     *   "last_page": 1,
+     *   "last_page_url": "http://localhost:8000/api/my-auctions?page=1",
+     *   "next_page_url": null,
+     *   "path": "http://localhost:8000/api/my-auctions",
+     *   "per_page": 12,
+     *   "prev_page_url": null,
+     *   "to": 1,
+     *   "total": 1
+     * }
      */
     public function myAuctions(): JsonResponse
     {
@@ -400,7 +612,19 @@ class AuctionController extends Controller
     }
 
     /**
+     * @group Auctions
+     * @authenticated
+     *
      * Hapus lelang (hanya jika status = scheduled dan milik sendiri).
+     *
+     * @urlParam auction integer required ID lelang. Example: 10
+     *
+     * @response 200 {
+     *   "message": "Lelang berhasil dihapus."
+     * }
+     * @response 422 {
+     *   "message": "Lelang hanya dapat dihapus sebelum dimulai."
+     * }
      */
     public function destroy(Auction $auction): JsonResponse
     {
@@ -423,7 +647,53 @@ class AuctionController extends Controller
     }
 
     /**
-     * Dashboard statistik, popular works, ended results, performance data, & recent activities.
+     * @group Auctions
+     * @authenticated
+     *
+     * Dashboard statistik, popular works, ended results, performance data, & recent activities (Seller).
+     *
+     * @response 200 {
+     *   "stats": {
+     *     "total": 5,
+     *     "active": 2,
+     *     "upcoming": 1,
+     *     "ended": 2
+     *   },
+     *   "popularWorks": [
+     *     {
+     *       "id": 1,
+     *       "name": "Lukisan Bali Klasik",
+     *       "image": "http://localhost:8000/storage/auctions/1/main.png",
+     *       "currentPrice": 12500000.0,
+     *       "totalBids": 3,
+     *       "watching": 10,
+     *       "badge": "Paling Banyak Ditawar"
+     *     }
+     *   ],
+     *   "recentActivities": [
+     *     {
+     *       "type": "bid",
+     *       "text": "Penawaran baru sebesar <strong>Rp 12.500.000</strong> pada <strong>\"Lukisan Bali Klasik\"</strong>",
+     *       "time": "5 minutes ago",
+     *       "timestamp": 1782012015
+     *     }
+     *   ],
+     *   "auctionResults": [
+     *     {
+     *       "id": 2,
+     *       "name": "Harmoni Semesta",
+     *       "finalPrice": 9800000.0,
+     *       "winner": "Made Ayu",
+     *       "totalBids": 5
+     *     }
+     *   ],
+     *   "performance": {
+     *     "totalEarnings": 19600000.0,
+     *     "endedCount": 2,
+     *     "avgPrice": 9800000.0,
+     *     "avgBids": 4
+     *   }
+     * }
      */
     public function dashboard(Request $request): JsonResponse
     {

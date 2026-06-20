@@ -14,7 +14,22 @@ use Illuminate\Support\Facades\DB;
 class BidController extends Controller
 {
     /**
-     * Tampilkan daftar penawaran lelang ini.
+     * @group Bids
+     *
+     * Tampilkan daftar penawaran lelang ini (Publik).
+     *
+     * @urlParam auction integer required ID lelang. Example: 1
+     *
+     * @response 200 [
+     *   {
+     *     "id": 3,
+     *     "user": "Wayan***",
+     *     "avatar": "https://i.pravatar.cc/32?u=3",
+     *     "amount": 12500000.0,
+     *     "time": "14:20:15",
+     *     "status": "active"
+     *   }
+     * ]
      */
     public function index(Auction $auction): JsonResponse
     {
@@ -46,7 +61,31 @@ class BidController extends Controller
     }
 
     /**
-     * Kirim penawaran baru.
+     * @group Bids
+     * @authenticated
+     *
+     * Kirim penawaran baru (Buyer).
+     *
+     * @urlParam auction integer required ID lelang. Example: 1
+     * @bodyParam amount numeric required Jumlah penawaran. Example: 13000000
+     *
+     * @response 201 {
+     *   "message": "Penawaran berhasil diajukan.",
+     *   "bid": {
+     *     "id": 4,
+     *     "auction_id": 1,
+     *     "bidder_id": 3,
+     *     "amount": 13000000.0,
+     *     "status": "active",
+     *     "placed_at": "2026-06-20T14:30:00.000000Z",
+     *     "created_at": "2026-06-20T14:30:00.000000Z",
+     *     "updated_at": "2026-06-20T14:30:00.000000Z"
+     *   },
+     *   "extended": false
+     * }
+     * @response 422 {
+     *   "message": "Tawaran minimal harus senilai 13.000.000."
+     * }
      */
     public function store(StoreBidRequest $request, Auction $auction): JsonResponse
     {
@@ -199,7 +238,48 @@ class BidController extends Controller
     }
 
     /**
+     * @group Bids
+     * @authenticated
+     *
      * Riwayat penawaran user yang sedang login.
+     *
+     * @queryParam per_page integer Jumlah item per halaman (default 12). Example: 12
+     *
+     * @response 200 {
+     *   "current_page": 1,
+     *   "data": [
+     *     {
+     *       "id": 1,
+     *       "name": "Lukisan Bali Klasik",
+     *       "artist": "Ketut Wirawan",
+     *       "category": "Lukisan",
+     *       "image": "http://localhost:8000/storage/auctions/1/main.png",
+     *       "myBid": 13000000.0,
+     *       "topBid": 13000000.0,
+     *       "totalBids": 4,
+     *       "lastBidTime": "20 Jun 2026 • 14:30 WITA",
+     *       "status": "leading",
+     *       "isActive": true,
+     *       "timeLeft": {
+     *         "d": "02",
+     *         "h": "04",
+     *         "m": "35"
+     *       },
+     *       "endDate": "27 Jun 2026",
+     *       "endsAt": "2026-06-27T10:00:00Z"
+     *     }
+     *   ],
+     *   "first_page_url": "http://localhost:8000/api/my-bids?page=1",
+     *   "from": 1,
+     *   "last_page": 1,
+     *   "last_page_url": "http://localhost:8000/api/my-bids?page=1",
+     *   "next_page_url": null,
+     *   "path": "http://localhost:8000/api/my-bids",
+     *   "per_page": 12,
+     *   "prev_page_url": null,
+     *   "to": 1,
+     *   "total": 1
+     * }
      */
     public function myBids(Request $request): JsonResponse
     {
@@ -269,7 +349,41 @@ class BidController extends Controller
     }
 
     /**
+     * @group Bids
+     * @authenticated
+     *
      * Dashboard data penawaran untuk buyer yang sedang login.
+     *
+     * @response 200 {
+     *   "stats": {
+     *     "total": 1,
+     *     "leading": 1,
+     *     "outbid": 0,
+     *     "won": 0,
+     *     "lost": 0,
+     *     "active": 1,
+     *     "ended": 0
+     *   },
+     *   "endingSoon": [
+     *     {
+     *       "id": 1,
+     *       "name": "Lukisan Bali Klasik",
+     *       "image": "http://localhost:8000/storage/auctions/1/main.png",
+     *       "status": "leading",
+     *       "countdown": "52:35:00",
+     *       "endsAt": "2026-06-27T10:00:00Z"
+     *     }
+     *   ],
+     *   "activities": [
+     *     {
+     *       "type": "bid",
+     *       "text": "Anda menawar <strong>Rp 13.000.000</strong> pada <strong>\"Lukisan Bali Klasik\"</strong>",
+     *       "time": "5 minutes ago"
+     *     }
+     *   ],
+     *   "totalSpentActive": 13000000.0,
+     *   "activeBidsCount": 1
+     * }
      */
     public function dashboard(Request $request): JsonResponse
     {

@@ -28,7 +28,7 @@ class UpdateProfileRequest extends FormRequest
     {
         // Mendapatkan ID user yang sedang login saat ini agar kita bisa mengabaikan email miliknya
         // saat melakukan pengecekan keunikan (unique) email di database.
-        $userId = $this->user()->id;
+        $userId = $this->user() ? $this->user()->id : null;
 
         return [
             // 'sometimes' berarti field ini hanya divalidasi jika ada dalam request body.

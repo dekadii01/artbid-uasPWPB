@@ -14,7 +14,10 @@ use Illuminate\Http\Request;
 class AuctionController extends Controller
 {
     /**
-     * Dashboard statistik, popular works, ended results, performance data, & recent activities.
+     * @group Admin Dashboard
+     * @authenticated
+     *
+     * Dashboard statistik, popular works, ended results, performance data, & recent activities (Admin).
      */
     public function dashboard(Request $request): JsonResponse
     {
@@ -253,7 +256,10 @@ class AuctionController extends Controller
     }
 
     /**
-     * Display a listing of the resource.
+     * @group Admin Auctions
+     * @authenticated
+     *
+     * Display a listing of all auctions including soft-deleted ones (Admin).
      */
     public function index(Request $request): JsonResponse
     {
@@ -403,7 +409,20 @@ class AuctionController extends Controller
     }
 
     /**
-     * Activate a scheduled auction.
+     * @group Admin Auctions
+     * @authenticated
+     *
+     * Activate a scheduled auction (Admin).
+     *
+     * @urlParam auction integer required ID lelang. Example: 1
+     *
+     * @response 200 {
+     *   "message": "Lelang berhasil diaktifkan.",
+     *   "auction": {
+     *     "id": 1,
+     *     "status": "active"
+     *   }
+     * }
      */
     public function activate($id): JsonResponse
     {
@@ -437,7 +456,16 @@ class AuctionController extends Controller
     }
 
     /**
-     * Force end an active auction.
+     * @group Admin Auctions
+     * @authenticated
+     *
+     * Force end an active auction (Admin).
+     *
+     * @urlParam auction integer required ID lelang. Example: 1
+     *
+     * @response 200 {
+     *   "message": "Lelang berhasil dihentikan."
+     * }
      */
     public function forceEnd($id): JsonResponse
     {
@@ -563,7 +591,16 @@ class AuctionController extends Controller
     }
 
     /**
-     * Delete an auction (permanent force delete - admin only).
+     * @group Admin Auctions
+     * @authenticated
+     *
+     * Delete an auction permanently (Admin).
+     *
+     * @urlParam auction integer required ID lelang. Example: 1
+     *
+     * @response 200 {
+     *   "message": "Lelang berhasil dihapus secara permanen oleh admin."
+     * }
      */
     public function destroy($id): JsonResponse
     {
@@ -600,7 +637,12 @@ class AuctionController extends Controller
     }
 
     /**
-     * Get auction details (including soft-deleted - admin only).
+     * @group Admin Auctions
+     * @authenticated
+     *
+     * Get detailed auction view (Admin).
+     *
+     * @urlParam auction integer required ID lelang. Example: 1
      */
     public function show($id): JsonResponse
     {
