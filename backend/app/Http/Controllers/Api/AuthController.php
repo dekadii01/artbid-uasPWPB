@@ -161,19 +161,15 @@ class AuthController extends Controller
      */
     public function handleGoogleCallback()
     {
+        $frontendUrl = env('FRONTEND_URL', 'http://localhost:5173');
+        
         try {
             $googleUser = Socialite::driver('google')->stateless()->user();
 
-            // Pisahkan nama depan dan belakang dari nama lengkap Google
             $nameParts = explode(' ', $googleUser->getName(), 2);
             $firstName = $nameParts[0] ?? $googleUser->getName();
             $lastName  = $nameParts[1] ?? '';
             
-            // Temukan atau buat user berdasarkan email dari Google.
-            // Catatan:
-            // - 'phone' wajib string kosong karena kolom NOT NULL di DB
-            // - 'password' cukup plain random string karena User model sudah
-            //   punya cast 'hashed' yang otomatis hash saat assign
             $user = User::firstOrCreate([
                 'email' => $googleUser->getEmail(),
             ], [
@@ -186,20 +182,18 @@ class AuthController extends Controller
             ]);
 
             if ($user->status === 'blocked') {
-                return redirect('http://localhost:5173/login?error=blocked');
+                return redirect($frontendUrl . '/login?error=blocked');
             }
 
-            // Hapus token lama & buat token baru
             $user->tokens()->delete();
             $token = $user->createToken('auth_token')->plainTextToken;
 
-            // Redirect ke halaman callback frontend untuk menyimpan token
-            return redirect('http://localhost:5173/auth/google/callback?token=' . $token);
+            return redirect($frontendUrl . '/auth/google/callback?token=' . $token);
         } catch (\Exception $e) {
             \Illuminate\Support\Facades\Log::error('Google OAuth failed: ' . $e->getMessage(), [
                 'trace' => $e->getTraceAsString(),
             ]);
-            return redirect('http://localhost:5173/login?error=oauth_failed');
+            return redirect($frontendUrl . '/login?error=oauth_failed');
         }
     }
 }
