@@ -94,7 +94,7 @@ const auctions = [
 </script>
 
 <template>
-  <section id="auctions" class="px-10 py-20">
+  <section id="auctions" class="px-4 md:px-10 py-20">
     <div class="flex items-end justify-between mb-12">
       <div>
         <span class="text-xs font-semibold tracking-[0.2em] uppercase text-gray-400">Sedang Berlangsung</span>

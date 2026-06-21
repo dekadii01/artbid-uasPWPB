@@ -62,7 +62,7 @@ onUnmounted(() => {
 
 <template>
   <section id="home" class="pt-0">
-    <div class="px-10 mx-auto h-dvh">
+    <div class="px-4 md:px-10 mx-auto h-dvh">
       <div
         class="bg-cover bg-center h-screen rounded-lg relative overflow-hidden"
         style="background-image: url(&quot;/img/hero.png&quot;)"
@@ -71,7 +71,7 @@ onUnmounted(() => {
           class="absolute inset-0 bg-linear-to-br from-black/70 via-black/40 to-black/60 rounded-lg"
         ></div>
 
-        <div class="relative p-10 h-full flex flex-col justify-between">
+        <div class="relative p-4 md:p-10 h-full flex flex-col justify-between">
           <div class="my-auto max-w-2xl">
             <h1
               class="text-white font-bold text-5xl md:text-7xl leading-none tracking-tight fade-up delay-2 mt-6"
@@ -149,7 +149,7 @@ onUnmounted(() => {
     </div>
 
     <!-- Stats -->
-    <div class="grid grid-cols-2 md:grid-cols-4 gap-4 p-10">
+    <div class="grid grid-cols-2 md:grid-cols-4 gap-4 px-4 py-10 md:p-10">
       <div
         v-for="stat in stats"
         :key="stat.label"
