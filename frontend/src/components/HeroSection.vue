@@ -61,17 +61,17 @@ onUnmounted(() => {
 </script>
 
 <template>
-  <section id="home" class="pt-0">
-    <div class="px-4 md:px-10 mx-auto h-dvh">
+  <section id="home" class="pt-[72px] md:pt-[96px]">
+    <div class="px-4 md:px-10 mx-auto min-h-[calc(100dvh-72px)] md:h-[calc(100dvh-96px)]">
       <div
-        class="bg-cover bg-center h-screen rounded-lg relative overflow-hidden"
+        class="bg-cover bg-center min-h-[calc(100dvh-72px)] md:h-full rounded-lg relative overflow-hidden"
         style="background-image: url(&quot;/img/hero.png&quot;)"
       >
         <div
           class="absolute inset-0 bg-linear-to-br from-black/70 via-black/40 to-black/60 rounded-lg"
         ></div>
 
-        <div class="relative p-4 md:p-10 h-full flex flex-col justify-between">
+        <div class="relative p-4 md:p-10 min-h-[calc(100dvh-72px)] md:min-h-0 md:h-full flex flex-col justify-between">
           <div class="my-auto max-w-2xl">
             <h1
               class="text-white font-bold text-5xl md:text-7xl leading-none tracking-tight fade-up delay-2 mt-6"
@@ -99,7 +99,7 @@ onUnmounted(() => {
           </div>
 
           <!-- Hero Bottom Bar -->
-          <div class="p-5 border fade-up delay-4">
+          <div class="p-5 fade-up delay-4">
             <div
               class="flex flex-col md:flex-row gap-4 md:items-center justify-between"
             >

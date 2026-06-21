@@ -16,6 +16,8 @@ const profileRef = ref(null);
 
 const notifOpen = ref(false);
 const notifRef = ref(null);
+const mobileNotifOpen = ref(false);
+const mobileNotifRef = ref(null);
 const notifications = ref([]);
 
 // ── User data — diambil langsung dari auth store ───────────────────
@@ -141,6 +143,9 @@ function handleClickOutside(e) {
   if (notifRef.value && !notifRef.value.contains(e.target)) {
     notifOpen.value = false;
   }
+  if (mobileNotifRef.value && !mobileNotifRef.value.contains(e.target)) {
+    mobileNotifOpen.value = false;
+  }
 }
 
 let echoUserChannel = null;
@@ -194,6 +199,17 @@ watch(
     }
   },
   { immediate: true }
+);
+
+// Close all dropdowns on route changes
+watch(
+  () => router.currentRoute.value.path,
+  () => {
+    profileOpen.value = false;
+    mobileOpen.value = false;
+    notifOpen.value = false;
+    mobileNotifOpen.value = false;
+  }
 );
 
 onMounted(() => {
@@ -418,14 +434,6 @@ onUnmounted(() => {
             </div>
           </transition>
         </div>
-
-        <!-- Buat Lelang CTA -->
-        <!-- <button
-          @click="router.push('/auction/create')"
-          class="cursor-pointer px-5 py-2 bg-black text-white rounded-lg text-sm font-medium hover:bg-gray-800 transition-colors"
-        >
-          + Buat Lelang
-        </button> -->
       </div>
     </div>
 
@@ -437,9 +445,9 @@ onUnmounted(() => {
 
       <div class="flex items-center gap-2">
         <!-- Notifications mobile -->
-        <div class="relative">
+        <div class="relative" ref="mobileNotifRef">
           <button
-            @click="notifOpen = !notifOpen"
+            @click="mobileNotifOpen = !mobileNotifOpen; mobileOpen = false"
             class="relative w-9 h-9 rounded-lg border border-gray-200 flex items-center justify-center text-gray-500"
           >
             <svg
@@ -472,11 +480,11 @@ onUnmounted(() => {
             leave-to-class="opacity-0 translate-y-1"
           >
             <div
-              v-if="notifOpen"
+              v-if="mobileNotifOpen"
               class="absolute right-0 top-full mt-2 w-72 bg-white rounded-xl border border-gray-100 shadow-lg overflow-hidden py-1.5 z-50 notif-dropdown"
             >
               <div class="px-4 py-2 flex items-center justify-between border-b border-gray-100">
-                <p class="text-xs font-semibold text-gray-950">Notifikasi</p>
+                <p class="text-xs font-semibold text-gray-900">Notifikasi</p>
                 <button
                   v-if="unreadCount > 0"
                   @click="handleMarkAllAsRead"
@@ -495,7 +503,7 @@ onUnmounted(() => {
                   v-else
                   v-for="notif in notifications"
                   :key="notif.id"
-                  @click="handleMarkAsRead(notif); notifOpen = false; mobileOpen = false; $router.push(notif.data?.auction_id ? `/auction/${notif.data.auction_id}` : '/')"
+                  @click="handleMarkAsRead(notif); mobileNotifOpen = false; mobileOpen = false; $router.push(notif.data?.auction_id ? `/auction/${notif.data.auction_id}` : '/')"
                   class="px-4 py-2.5 border-b border-gray-50 last:border-b-0 hover:bg-gray-50 cursor-pointer transition-colors flex items-start gap-2 text-left"
                   :class="{ 'bg-gray-50/50 font-medium': !notif.read_at }"
                 >
@@ -520,6 +528,8 @@ onUnmounted(() => {
                     <p class="text-[11px] text-gray-900 leading-snug">{{ notif.title }}</p>
                     <p class="text-[9px] text-gray-400 mt-0.5 line-clamp-2">{{ notif.body }}</p>
                   </div>
+                  <!-- Unread indicator -->
+                  <span v-if="!notif.read_at" class="w-1.5 h-1.5 bg-black rounded-full shrink-0 mt-2"></span>
                 </div>
               </div>
             </div>
@@ -528,7 +538,7 @@ onUnmounted(() => {
 
         <!-- Hamburger -->
         <button
-          @click="mobileOpen = !mobileOpen"
+          @click="mobileOpen = !mobileOpen; mobileNotifOpen = false"
           class="w-9 h-9 rounded-lg border border-gray-200 flex flex-col items-center justify-center gap-1.5"
         >
           <span
