@@ -36,7 +36,7 @@ function toggleFaq(index) {
 </script>
 
 <template>
-  <section id="faq" class="px-10 py-20">
+  <section id="faq" class="px-4 md:px-10 py-20">
     <div class="max-w-2xl mx-auto">
       <div class="text-center mb-12">
         <span class="text-xs font-semibold tracking-[0.2em] uppercase text-gray-400">Pertanyaan Umum</span>

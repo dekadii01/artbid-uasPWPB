@@ -81,7 +81,7 @@ const ajukanTawaran = () => {
 
 <template>
   <section
-    class="px-10 py-20 bg-black rounded-3xl mx-6 overflow-hidden relative"
+    class="px-4 md:px-10 py-20 bg-black rounded-3xl mx-4 md:mx-6 overflow-hidden relative"
   >
     <div
       class="absolute -top-40 -right-40 w-96 h-96 bg-white/5 rounded-full blur-3xl pointer-events-none"

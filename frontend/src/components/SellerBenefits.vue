@@ -40,7 +40,7 @@ const benefits = [
 </script>
 
 <template>
-  <section id="sellers" class="px-10 py-20 bg-gray-50 rounded-3xl mx-6">
+  <section id="sellers" class="px-4 md:px-10 py-20 bg-gray-50 rounded-3xl mx-4 md:mx-6">
     <div class="flex flex-col md:flex-row md:items-end justify-between mb-12 gap-4">
       <div>
         <span class="text-xs font-semibold tracking-[0.2em] uppercase text-gray-400">Untuk Seniman & Kolektor</span>

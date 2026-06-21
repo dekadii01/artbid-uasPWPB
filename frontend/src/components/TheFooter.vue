@@ -18,7 +18,7 @@ const legalLinks = [
 
 <template>
   <footer
-    class="bg-black text-white/60 pt-16 pb-10 px-10 border-t border-white/10"
+    class="bg-black text-white/60 pt-16 pb-10 px-4 md:px-10 border-t border-white/10"
   >
     <div class="mx-auto grid grid-cols-1 md:grid-cols-4 gap-12 mb-16">
       <!-- Brand column -->

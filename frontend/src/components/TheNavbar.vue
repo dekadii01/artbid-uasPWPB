@@ -106,7 +106,7 @@ onUnmounted(() => {
 <template>
   <nav
     :class="[
-      'nav-bar fixed top-0 left-0 right-0 z-50 transition-all duration-300 px-10',
+      'nav-bar fixed top-0 left-0 right-0 z-50 transition-all duration-300 px-0 md:px-10',
       { 'nav-scrolled': isScrolled },
     ]"
   >
@@ -254,7 +254,7 @@ onUnmounted(() => {
 
     <!-- ── Mobile Nav Header ── -->
     <div
-      class="md:hidden px-6 py-5 flex items-center justify-between bg-white/90 backdrop-blur-sm"
+      class="md:hidden px-4 py-5 flex items-center justify-between bg-white/90 backdrop-blur-sm"
     >
       <router-link
         to="/"
@@ -291,7 +291,7 @@ onUnmounted(() => {
     <!-- ── Mobile Menu ── -->
     <div
       :class="[
-        'mobile-menu md:hidden bg-white/95 backdrop-blur-sm px-6 pb-6',
+        'mobile-menu md:hidden bg-white/95 backdrop-blur-sm px-4',
         { open: isMobileMenuOpen },
       ]"
     >

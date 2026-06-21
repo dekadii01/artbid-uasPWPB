@@ -40,7 +40,7 @@ const testimonials = [
 </script>
 
 <template>
-  <section class="px-10 py-20">
+  <section class="px-4 md:px-10 py-20">
     <div class="text-center mb-14">
       <span class="text-xs font-semibold tracking-[0.2em] uppercase text-gray-400">Kata Mereka</span>
       <h2 class="text-4xl font-bold mt-3">Dipercaya Kolektor & Seniman</h2>
