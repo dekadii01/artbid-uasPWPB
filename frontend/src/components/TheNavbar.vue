@@ -308,7 +308,7 @@ onUnmounted(() => {
       </ul>
 
       <!-- Mobile: guest -->
-      <div v-if="!isLoggedIn" class="flex gap-3 mt-5">
+      <div v-if="!isLoggedIn" class="flex gap-3 my-5">
         <router-link
           to="/login"
           class="px-4 py-2 text-gray-800 border border-gray-200 rounded-lg flex-1 text-sm text-center"
