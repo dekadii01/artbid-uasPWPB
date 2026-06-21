@@ -47,6 +47,19 @@ onMounted(() => {
         fetchAuction(true); // silent fetch to avoid glitch/flicker
       }
     }
+
+    // Set status to 'ended' and refresh data once live ends
+    if (
+      auction.value &&
+      auction.value.status === "live" &&
+      auction.value.endsAt
+    ) {
+      const endTime = new Date(auction.value.endsAt);
+      if (now.value >= endTime) {
+        auction.value.status = "ended";
+        fetchAuction(true); // silent fetch to get the winner data
+      }
+    }
   }, 1000);
 });
 onUnmounted(() => clearInterval(ticker));

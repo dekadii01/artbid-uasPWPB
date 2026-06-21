@@ -203,6 +203,11 @@ class AuctionController extends Controller
             $auction->status = 'active'; // keep in-memory model updated
         }
 
+        if ($auction->status === 'active' && $auction->ends_at && $auction->ends_at->isPast()) {
+            \Illuminate\Support\Facades\Artisan::call('auctions:close');
+            $auction->refresh(); // Reload to get updated status and winner info
+        }
+
         $auction->load([
             'seller:id,first_name,last_name,email,avatar,created_at',
             'category:id,name',
