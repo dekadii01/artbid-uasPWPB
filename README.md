@@ -12,7 +12,7 @@ Platform ini memungkinkan pengguna menawar karya seni secara langsung (realtime 
 
 ---
 
-## 🚀 Fitur Utama
+##  Fitur Utama
 
 1. **Realtime Bidding Engine**: Menampilkan penawaran harga terbaru secara instan menggunakan WebSocket (Laravel Reverb & Laravel Echo client).
 2. **Buy Now (Beli Instan)**: Opsi bagi pembeli untuk memenangkan karya seni secara langsung dengan harga yang ditentukan oleh penjual.
@@ -24,7 +24,7 @@ Platform ini memungkinkan pengguna menawar karya seni secara langsung (realtime 
 
 ---
 
-## 🛠️ Tech Stack
+##  Tech Stack
 
 ### Backend (Folder `/backend`)
 *   **Framework**: Laravel 11
@@ -62,7 +62,18 @@ ArtBid/
 
 ---
 
-## 📦 Panduan Instalasi & Pengaturan
+##  Entity Relationship Diagram (ERD)
+
+Berikut adalah diagram hubungan entitas (ERD) database ArtBid Bali:
+
+[![ArtBid Bali ERD](erd.png)](https://dbdiagram.io/d/ARTBID-BALI-6a37d8b29340ecc065e0da7e)
+
+Anda dapat mengakses diagram interaktif secara langsung di:
+[dbdiagram.io/d/ARTBID-BALI-6a37d8b29340ecc065e0da7e](https://dbdiagram.io/d/ARTBID-BALI-6a37d8b29340ecc065e0da7e)
+
+---
+
+##  Panduan Instalasi & Pengaturan
 
 ### Prasyarat
 Pastikan Anda sudah menginstal:
@@ -166,7 +177,7 @@ Frontend sekarang berjalan di `http://localhost:5173`.
 
 ---
 
-## 📝 Dokumentasi API
+##  Dokumentasi API
 
 ArtBid menggunakan Scribe untuk menghasilkan dokumentasi API interaktif yang diperbarui secara otomatis dari anotasi kode controller.
 
@@ -179,7 +190,7 @@ ArtBid menggunakan Scribe untuk menghasilkan dokumentasi API interaktif yang dip
 
 ---
 
-## 🧪 Menjalankan Pengujian (Testing)
+##  Menjalankan Pengujian (Testing)
 
 Kami menulis pengujian unit & fitur lengkap menggunakan Pest PHP untuk menjamin reliabilitas alur bidding, penanganan saldo/transaksi, notifikasi, serta keamanan level admin.
 
@@ -190,14 +201,11 @@ php artisan test
 
 ---
 
-## 🤝 Penulis Proyek
+##  Anggota Kelompok
 
-Proyek tugas kuliah ini dikembangkan secara kolaboratif oleh:
-*   **Developer Backend**: Pengembang API Laravel 11, Websocket, & Database.
-*   **Developer Frontend**: Pengembang UI Vue 3 & Client-side Integration.
+Anggota Kelompok:
+*   **I Kadek Laba Adi Pramana** [2401010015]
+*   **Gde Ngurah Yudiantara**    [2401010010]
+*   **I Gede Mantre Bimantara Giri** [2401010020]
 
----
 
-## 📄 Lisensi
-
-Proyek ini dirilis di bawah lisensi [MIT License](LICENSE).
